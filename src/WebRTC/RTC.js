@@ -179,3 +179,12 @@ exports._onsignalingstatechange = function(f) {
     };
 };
 
+exports._getSignalingState = function(pc) {
+  return pc.signalingState;
+};
+
+exports._getIceConnectionState = function(pc) {
+  return pc.iceConnectionState;
+};
+
+

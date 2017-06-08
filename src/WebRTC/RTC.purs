@@ -24,6 +24,8 @@ module WebRTC.RTC (
 , onicecandidate
 , onaddstream
 , onsignalingstatechange
+, getSignalingState
+, getIceConnectionState
 , rtcSessionDescription
 ) where
 
@@ -35,10 +37,11 @@ import Control.Monad.Except (runExcept, throwError)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap, class Newtype)
 import Data.Nullable (Nullable)
-import Data.Either (Either(..))
+import Data.Either (Either(..), fromRight)
 import Data.Foreign.Index (readProp)
 import Data.Foreign (Foreign, readString, ForeignError(..), fail, toForeign)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
+import Partial.Unsafe (unsafePartial)
 import Prelude
 
 data RTCSignalingState
@@ -267,3 +270,15 @@ onsignalingstatechange f = _onsignalingstatechange \state ->
   case runExcept $ decode state of
     Right s -> f s
     _       -> pure unit
+
+foreign import _getSignalingState
+  :: RTCPeerConnection -> Foreign
+
+getSignalingState :: RTCPeerConnection -> RTCSignalingState
+getSignalingState pc = unsafePartial $ fromRight $ runExcept $ decode $ _getSignalingState pc
+
+foreign import _getIceConnectionState
+  :: RTCPeerConnection -> Foreign
+
+getIceConnectionState :: RTCPeerConnection -> RTCIceConnectionState
+getIceConnectionState pc = unsafePartial $ fromRight $ runExcept $ decode $ _getIceConnectionState pc
