@@ -32,7 +32,7 @@ module WebRTC.RTC (
 import WebRTC.MediaStream
 import Control.Monad.Aff (Aff, makeAff)
 import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Exception (Error, error)
+import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
 import Control.Monad.Except (runExcept, throwError)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap, class Newtype)
@@ -274,11 +274,15 @@ onsignalingstatechange f = _onsignalingstatechange \state ->
 foreign import _getSignalingState
   :: RTCPeerConnection -> Foreign
 
-getSignalingState :: RTCPeerConnection -> RTCSignalingState
-getSignalingState pc = unsafePartial $ fromRight $ runExcept $ decode $ _getSignalingState pc
+getSignalingState :: ∀ eff. RTCPeerConnection -> Eff (exception :: EXCEPTION | eff) RTCSignalingState
+getSignalingState pc = case runExcept $ decode $ _getSignalingState pc of
+                            Left err -> throwException (error $ show err)
+                            Right v -> pure v
 
 foreign import _getIceConnectionState
   :: RTCPeerConnection -> Foreign
 
-getIceConnectionState :: RTCPeerConnection -> RTCIceConnectionState
-getIceConnectionState pc = unsafePartial $ fromRight $ runExcept $ decode $ _getIceConnectionState pc
+getIceConnectionState :: ∀ eff. RTCPeerConnection -> Eff (exception :: EXCEPTION | eff) RTCIceConnectionState
+getIceConnectionState pc = case runExcept $ decode $ _getIceConnectionState pc of
+                            Left err -> throwException (error $ show err)
+                            Right v -> pure v
