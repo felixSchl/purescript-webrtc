@@ -11,8 +11,6 @@ module WebRTC.RTC (
 , RTCIceConnectionState(..)
 , newRTCPeerConnection
 , addStream
-, onicecandidate
-, onaddstream
 , createOffer
 , createAnswer
 , setLocalDescription
@@ -23,6 +21,9 @@ module WebRTC.RTC (
 , send
 , onmessageChannel
 , oniceconnectionstatechange
+, onicecandidate
+, onaddstream
+, onsignalingstatechange
 , rtcSessionDescription
 ) where
 
@@ -240,7 +241,7 @@ foreign import onmessageChannel
                Eff e Unit
 
 foreign import _oniceconnectionstatechange
-  :: forall e. (String -> Eff e Unit) ->
+  :: forall e. (Foreign -> Eff e Unit) ->
                RTCPeerConnection ->
                Eff e Unit
 
@@ -248,12 +249,21 @@ oniceconnectionstatechange
   :: forall e. (RTCIceConnectionState -> Eff e Unit) ->
                RTCPeerConnection ->
                Eff e Unit
-oniceconnectionstatechange f = _oniceconnectionstatechange \x -> case x of
-  "new"          -> f RTCIceConnectionStateNew
-  "checking"     -> f RTCIceConnectionStateChecking
-  "connected"    -> f RTCIceConnectionStateConnected
-  "completed"    -> f RTCIceConnectionStateCompleted
-  "failed"       -> f RTCIceConnectionStateFailed
-  "disconnected" -> f RTCIceConnectionStateDisconnected
-  "closed"       -> f RTCIceConnectionStateClosed
-  _              -> pure unit
+oniceconnectionstatechange f = _oniceconnectionstatechange \state ->
+  case runExcept $ decode state of
+    Right s -> f s
+    _       -> pure unit
+
+foreign import _onsignalingstatechange
+  :: forall e. (Foreign -> Eff e Unit) ->
+               RTCPeerConnection ->
+               Eff e Unit
+
+onsignalingstatechange
+  :: forall e. (RTCSignalingState -> Eff e Unit) ->
+               RTCPeerConnection ->
+               Eff e Unit
+onsignalingstatechange f = _onsignalingstatechange \state ->
+  case runExcept $ decode state of
+    Right s -> f s
+    _       -> pure unit
