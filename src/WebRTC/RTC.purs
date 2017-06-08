@@ -6,6 +6,7 @@ module WebRTC.RTC (
 , MediaStreamEvent(..)
 , RTCIceCandidate(..)
 , RTCDataChannel(..)
+, IceConnectionState(..)
 , newRTCPeerConnection
 , addStream
 , onicecandidate
@@ -20,6 +21,7 @@ module WebRTC.RTC (
 , createDataChannel
 , send
 , onmessageChannel
+, oniceconnectionstatechange
 ) where
 
 import WebRTC.MediaStream
@@ -28,7 +30,16 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (Error)
 import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable)
-import Prelude (Unit, unit)
+import Prelude (Unit, unit, pure)
+
+data IceConnectionState
+  = IceConnectionStateNew
+  | IceConnectionStateChecking
+  | IceConnectionStateConnected
+  | IceConnectionStateCompleted
+  | IceConnectionStateFailed
+  | IceConnectionStateDisconnected
+  | IceConnectionStateClosed
 
 foreign import data RTCPeerConnection :: Type
 
@@ -132,3 +143,22 @@ foreign import onmessageChannel
   :: forall e. (String -> Eff e Unit) ->
                RTCDataChannel ->
                Eff e Unit
+
+foreign import _oniceconnectionstatechange
+  :: forall e. (String -> Eff e Unit) ->
+               RTCPeerConnection ->
+               Eff e Unit
+
+oniceconnectionstatechange
+  :: forall e. (IceConnectionState -> Eff e Unit) ->
+               RTCPeerConnection ->
+               Eff e Unit
+oniceconnectionstatechange f = _oniceconnectionstatechange \x -> case x of
+  "new"          -> f IceConnectionStateNew
+  "checking"     -> f IceConnectionStateChecking
+  "connected"    -> f IceConnectionStateConnected
+  "completed"    -> f IceConnectionStateCompleted
+  "failed"       -> f IceConnectionStateFailed
+  "disconnected" -> f IceConnectionStateDisconnected
+  "closed"       -> f IceConnectionStateClosed
+  _              -> pure unit

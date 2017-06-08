@@ -159,3 +159,14 @@ exports.onmessageChannel = function(f) {
     };
 };
 
+
+exports._oniceconnectionstatechange = function(f) {
+    return function(pc) {
+        return function() {
+            pc.iceconnectionstatechange = function() {
+                f(pc.iceConnectionState)();
+            };
+        };
+    };
+};
+
