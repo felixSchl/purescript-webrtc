@@ -6,6 +6,7 @@ module WebRTC.RTC (
 , IceEvent(..)
 , MediaStreamEvent(..)
 , RTCIceCandidate(..)
+, RTCSignalingState(..)
 , RTCDataChannel(..)
 , RTCIceConnectionState(..)
 , newRTCPeerConnection
@@ -38,6 +39,29 @@ import Data.Foreign.Index (readProp)
 import Data.Foreign (Foreign, readString, ForeignError(..), fail, toForeign)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
 import Prelude
+
+data RTCSignalingState
+  = RTCSignalingStateStable
+  | RTCSignalingStateHaveLocalOffer
+  | RTCSignalingStateHaveRemoteOffer
+  | RTCSignalingStateHaveLocalPranswer
+  | RTCSignalingStateHaveRemotePranswer
+
+instance encodeRTCSignalingState :: Encode RTCSignalingState where
+  encode RTCSignalingStateStable             = encode "stable"
+  encode RTCSignalingStateHaveLocalOffer     = encode "have-local-offer"
+  encode RTCSignalingStateHaveRemoteOffer    = encode "have-remote-offer"
+  encode RTCSignalingStateHaveLocalPranswer  = encode "have-local-pranswer"
+  encode RTCSignalingStateHaveRemotePranswer = encode "have-remote-pranswer"
+
+instance decodeRTCSignalingState :: Decode RTCSignalingState where
+  decode f = readString f >>= case _ of
+    "stable"               -> pure RTCSignalingStateStable
+    "have-local-offer"     -> pure RTCSignalingStateHaveLocalOffer
+    "have-remote-offer"    -> pure RTCSignalingStateHaveRemoteOffer
+    "have-local-pranswer"  -> pure RTCSignalingStateHaveLocalPranswer
+    "have-remote-pranswer" -> pure RTCSignalingStateHaveRemotePranswer
+    state                 -> fail $ ForeignError $ "Invalid signaling state: " <> show state
 
 data RTCIceConnectionState
   = RTCIceConnectionStateNew
