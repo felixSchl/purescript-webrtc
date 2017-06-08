@@ -1,12 +1,13 @@
 module WebRTC.RTC (
   RTCPeerConnection(..)
 , RTCSessionDescription(..)
+, RTCSdpType(..)
 , Ice(..)
 , IceEvent(..)
 , MediaStreamEvent(..)
 , RTCIceCandidate(..)
 , RTCDataChannel(..)
-, IceConnectionState(..)
+, RTCIceConnectionState(..)
 , newRTCPeerConnection
 , addStream
 , onicecandidate
@@ -15,31 +16,98 @@ module WebRTC.RTC (
 , createAnswer
 , setLocalDescription
 , setRemoteDescription
-, newRTCSessionDescription
 , iceEventCandidate
 , addIceCandidate
 , createDataChannel
 , send
 , onmessageChannel
 , oniceconnectionstatechange
+, rtcSessionDescription
 ) where
 
 import WebRTC.MediaStream
 import Control.Monad.Aff (Aff, makeAff)
 import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Exception (Error)
+import Control.Monad.Eff.Exception (Error, error)
+import Control.Monad.Except (runExcept, throwError)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap, wrap, class Newtype)
 import Data.Nullable (Nullable)
-import Prelude (Unit, unit, pure)
+import Data.Either (Either(..))
+import Data.Foreign.Index (readProp)
+import Data.Foreign (Foreign, readString, ForeignError(..), fail, toForeign)
+import Data.Foreign.Class (class Decode, class Encode, encode, decode)
+import Prelude
 
-data IceConnectionState
-  = IceConnectionStateNew
-  | IceConnectionStateChecking
-  | IceConnectionStateConnected
-  | IceConnectionStateCompleted
-  | IceConnectionStateFailed
-  | IceConnectionStateDisconnected
-  | IceConnectionStateClosed
+data RTCIceConnectionState
+  = RTCIceConnectionStateNew
+  | RTCIceConnectionStateChecking
+  | RTCIceConnectionStateConnected
+  | RTCIceConnectionStateCompleted
+  | RTCIceConnectionStateFailed
+  | RTCIceConnectionStateDisconnected
+  | RTCIceConnectionStateClosed
+
+instance encodeRTCIceConnectionState :: Encode RTCIceConnectionState where
+  encode RTCIceConnectionStateNew          = encode "new"
+  encode RTCIceConnectionStateChecking     = encode "checking"
+  encode RTCIceConnectionStateConnected    = encode "connected"
+  encode RTCIceConnectionStateCompleted    = encode "completed"
+  encode RTCIceConnectionStateFailed       = encode "failed"
+  encode RTCIceConnectionStateDisconnected = encode "disconnected"
+  encode RTCIceConnectionStateClosed       = encode "closed"
+
+instance decodeRTCIceConnectionState :: Decode RTCIceConnectionState where
+  decode f = readString f >>= case _ of
+    "new"          -> pure RTCIceConnectionStateNew
+    "checking"     -> pure RTCIceConnectionStateChecking
+    "connected"    -> pure RTCIceConnectionStateConnected
+    "completed"    -> pure RTCIceConnectionStateCompleted
+    "failed"       -> pure RTCIceConnectionStateFailed
+    "disconnected" -> pure RTCIceConnectionStateDisconnected
+    "closed"       -> pure RTCIceConnectionStateClosed
+    state          -> fail $ ForeignError $ "Invalid ICE state: " <> show state
+
+data RTCSdpType
+  = RTCSdpTypeAnswer
+  | RTCSdpTypeOffer
+  | RTCSdpTypePranswer
+  | RTCSdpTypeRollback
+
+instance encodeRTCSdpType :: Encode RTCSdpType where
+  encode RTCSdpTypeAnswer   = encode "answer"
+  encode RTCSdpTypeOffer    = encode "offer"
+  encode RTCSdpTypePranswer = encode "pranswer"
+  encode RTCSdpTypeRollback = encode "rollback"
+
+instance decodeRTCSdpType :: Decode RTCSdpType where
+  decode f = readString f >>= case _ of
+    "answer"   -> pure RTCSdpTypeAnswer
+    "pranswer" -> pure RTCSdpTypePranswer
+    "offer"    -> pure RTCSdpTypeOffer
+    "rollback" -> pure RTCSdpTypeRollback
+    type_      -> fail $ ForeignError $ "Invalid sdp type: " <> show type_
+
+newtype RTCSessionDescription = RTCSessionDescription
+  { type :: RTCSdpType
+  , sdp :: String
+  }
+
+rtcSessionDescription :: RTCSdpType -> String -> RTCSessionDescription
+rtcSessionDescription type_ sdp = RTCSessionDescription { type: type_, sdp }
+
+derive instance rtcSessionDescriptionNewtype :: Newtype RTCSessionDescription _
+
+instance encodeRTCSessionDescription :: Encode RTCSessionDescription where
+  encode (RTCSessionDescription desc) = toForeign { type: encode desc.type
+                                                  , sdp: desc.sdp
+                                                  }
+
+instance decodeRTCSessionDescription :: Decode RTCSessionDescription where
+  decode f = RTCSessionDescription <$> do
+    { type: _, sdp: _ }
+      <$> (decode =<< readProp "type" f)
+      <*> (readString =<< readProp "sdp" f)
 
 foreign import data RTCPeerConnection :: Type
 
@@ -84,48 +152,51 @@ foreign import onaddstream
                RTCPeerConnection ->
                Eff e Unit
 
-foreign import data RTCSessionDescription :: Type
-
-foreign import newRTCSessionDescription
-  :: { sdp :: String, "type" :: String } -> RTCSessionDescription
-
 foreign import _createOffer
-  :: forall e. (RTCSessionDescription -> Eff e Unit) ->
+  :: forall e. (Foreign -> Eff e Unit) ->
                (Error -> Eff e Unit) ->
                RTCPeerConnection ->
                Eff e Unit
 
 createOffer :: forall e. RTCPeerConnection -> Aff e RTCSessionDescription
-createOffer pc = makeAff (\e s -> _createOffer s e pc)
+createOffer pc = do
+  f <- makeAff (\e s -> _createOffer s e pc)
+  case runExcept $ decode f of
+       Left err -> throwError (error $ show err)
+       Right v  -> pure v
 
 foreign import _createAnswer
-  :: forall e. (RTCSessionDescription -> Eff e Unit) ->
+  :: forall e. (Foreign -> Eff e Unit) ->
                (Error -> Eff e Unit) ->
                RTCPeerConnection ->
                Eff e Unit
 
 createAnswer :: forall e. RTCPeerConnection -> Aff e RTCSessionDescription
-createAnswer pc = makeAff (\e s -> _createAnswer s e pc)
+createAnswer pc = do
+  f <- makeAff (\e s -> _createAnswer s e pc)
+  case runExcept $ decode f of
+       Left err -> throwError (error $ show err)
+       Right v  -> pure v
 
 foreign import _setLocalDescription
   :: forall e. Eff e Unit ->
                (Error -> Eff e Unit) ->
-               RTCSessionDescription ->
+               Foreign ->
                RTCPeerConnection ->
                Eff e Unit
 
 setLocalDescription :: forall e. RTCSessionDescription -> RTCPeerConnection -> Aff e Unit
-setLocalDescription desc pc = makeAff (\e s -> _setLocalDescription (s unit) e desc pc)
+setLocalDescription desc pc = makeAff (\e s -> _setLocalDescription (s unit) e (encode desc) pc)
 
 foreign import _setRemoteDescription
   :: forall e. Eff e Unit ->
                (Error -> Eff e Unit) ->
-               RTCSessionDescription ->
+               Foreign ->
                RTCPeerConnection ->
                Eff e Unit
 
 setRemoteDescription :: forall e. RTCSessionDescription -> RTCPeerConnection -> Aff e Unit
-setRemoteDescription desc pc = makeAff (\e s -> _setRemoteDescription (s unit) e desc pc)
+setRemoteDescription desc pc = makeAff (\e s -> _setRemoteDescription (s unit) e (encode desc) pc)
 
 foreign import data RTCDataChannel :: Type
 
@@ -150,15 +221,15 @@ foreign import _oniceconnectionstatechange
                Eff e Unit
 
 oniceconnectionstatechange
-  :: forall e. (IceConnectionState -> Eff e Unit) ->
+  :: forall e. (RTCIceConnectionState -> Eff e Unit) ->
                RTCPeerConnection ->
                Eff e Unit
 oniceconnectionstatechange f = _oniceconnectionstatechange \x -> case x of
-  "new"          -> f IceConnectionStateNew
-  "checking"     -> f IceConnectionStateChecking
-  "connected"    -> f IceConnectionStateConnected
-  "completed"    -> f IceConnectionStateCompleted
-  "failed"       -> f IceConnectionStateFailed
-  "disconnected" -> f IceConnectionStateDisconnected
-  "closed"       -> f IceConnectionStateClosed
+  "new"          -> f RTCIceConnectionStateNew
+  "checking"     -> f RTCIceConnectionStateChecking
+  "connected"    -> f RTCIceConnectionStateConnected
+  "completed"    -> f RTCIceConnectionStateCompleted
+  "failed"       -> f RTCIceConnectionStateFailed
+  "disconnected" -> f RTCIceConnectionStateDisconnected
+  "closed"       -> f RTCIceConnectionStateClosed
   _              -> pure unit
