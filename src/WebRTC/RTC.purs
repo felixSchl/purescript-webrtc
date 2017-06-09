@@ -15,7 +15,6 @@ module WebRTC.RTC (
 , createAnswer
 , setLocalDescription
 , setRemoteDescription
-, iceEventCandidate
 , addIceCandidate
 , createDataChannel
 , send
@@ -34,15 +33,44 @@ import Control.Monad.Aff (Aff, makeAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
 import Control.Monad.Except (runExcept, throwError)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe, fromMaybe)
+import Data.Generic (class Generic)
 import Data.Newtype (unwrap, wrap, class Newtype)
 import Data.Nullable (Nullable)
 import Data.Either (Either(..), fromRight)
-import Data.Foreign.Index (readProp)
-import Data.Foreign (Foreign, readString, ForeignError(..), fail, toForeign)
+import Data.Foreign.Index (readProp, class Index, hasOwnProperty)
+import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
+                      readNullOrUndefined, readInt)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
+import Data.Foreign.NullOrUndefined (undefined)
 import Partial.Unsafe (unsafePartial)
 import Prelude
+
+foreign import data IceEvent :: Type
+
+data RTCIceCandidate = RTCIceCandidate
+  { sdpMLineIndex :: Maybe Int
+  , sdpMid :: Maybe String
+  , candidate :: String
+  }
+
+instance encodeRTCIceCandidate :: Encode RTCIceCandidate where
+  encode (RTCIceCandidate cand) = toForeign
+    { sdpMLineIndex: maybe undefined toForeign cand.sdpMLineIndex
+    , sdpMid: maybe undefined toForeign cand.sdpMid
+    , candidate: encode cand.candidate
+    }
+
+instance decodeRTCIceCandidate :: Decode RTCIceCandidate where
+  decode f = RTCIceCandidate <$> do
+    { candidate: _, sdpMid: _, sdpMLineIndex: _ }
+      <$> (readString =<< readProp "sdpMid" f)
+      <*> (maybe (pure Nothing) (map Just <<< readString) =<< readPropMaybe "sdpMid" f)
+      <*> (maybe (pure Nothing) (map Just <<< readInt) =<< readPropMaybe "sdpMLineIndex" f)
+
+readPropMaybe :: String -> Foreign -> F (Maybe Foreign)
+readPropMaybe k v | hasOwnProperty k v = readNullOrUndefined =<< readProp k v
+readPropMaybe _ _ = pure Nothing
 
 data RTCSignalingState
   = RTCSignalingStateStable
@@ -65,7 +93,7 @@ instance decodeRTCSignalingState :: Decode RTCSignalingState where
     "have-remote-offer"    -> pure RTCSignalingStateHaveRemoteOffer
     "have-local-pranswer"  -> pure RTCSignalingStateHaveLocalPranswer
     "have-remote-pranswer" -> pure RTCSignalingStateHaveRemotePranswer
-    state                 -> fail $ ForeignError $ "Invalid signaling state: " <> show state
+    state                  -> fail $ ForeignError $ "Invalid signaling state: " <> show state
 
 data RTCIceConnectionState
   = RTCIceConnectionStateNew
@@ -147,31 +175,17 @@ foreign import newRTCPeerConnection
 foreign import addStream
   :: forall e. MediaStream -> RTCPeerConnection -> Eff e Unit
 
-foreign import data IceEvent :: Type
-
-type RTCIceCandidate = { sdpMLineIndex :: Nullable Int
-                       , sdpMid :: Nullable String
-                       , candidate :: String
-                       }
-
-foreign import _iceEventCandidate
-  :: forall a. Maybe a ->
-               (a -> Maybe a) ->
-               IceEvent ->
-               Maybe RTCIceCandidate
-
-iceEventCandidate :: IceEvent -> Maybe RTCIceCandidate
-iceEventCandidate = _iceEventCandidate Nothing Just
-
-foreign import addIceCandidate
-  :: forall e. RTCIceCandidate ->
+foreign import _addIceCandidate
+  :: forall e. Foreign ->
                RTCPeerConnection ->
                Eff e Unit
 
-foreign import onicecandidate
-  :: forall e. (IceEvent -> Eff e Unit) ->
-               RTCPeerConnection ->
-               Eff e Unit
+addIceCandidate
+  :: ∀ e
+   . RTCIceCandidate
+  -> RTCPeerConnection
+  -> Eff e Unit
+addIceCandidate = _addIceCandidate <<< encode
 
 type MediaStreamEvent = { stream :: MediaStream }
 
@@ -268,6 +282,20 @@ onsignalingstatechange
                Eff e Unit
 onsignalingstatechange f = _onsignalingstatechange \state ->
   case runExcept $ decode state of
+    Right s -> f s
+    _       -> pure unit
+
+foreign import _onicecandidate
+  :: forall e. (Foreign -> Eff e Unit) ->
+               RTCPeerConnection ->
+               Eff e Unit
+
+onicecandidate
+  :: forall e. (RTCIceCandidate -> Eff e Unit) ->
+               RTCPeerConnection ->
+               Eff e Unit
+onicecandidate f = _onicecandidate \cand ->
+  case runExcept $ decode cand of
     Right s -> f s
     _       -> pure unit
 

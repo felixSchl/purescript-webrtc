@@ -18,16 +18,6 @@ exports.addStream = function(stream) {
     };
 };
 
-exports.onicecandidate = function(f) {
-    return function(pc) {
-        return function() {
-            pc.onicecandidate = function(event) {
-                f(event)();
-            };
-        };
-    };
-};
-
 exports.onaddstream = function(f) {
     return function(pc) {
         return function() {
@@ -108,15 +98,7 @@ exports._setRemoteDescription = function(success) {
     };
 };
 
-exports._iceEventCandidate = function(nothing) {
-    return function(just) {
-        return function(e) {
-            return e.candidate ? just(e.candidate) : nothing;
-        };
-    };
-};
-
-exports.addIceCandidate = function(c) {
+exports._addIceCandidate = function(c) {
     return function(pc) {
         return function() {
             pc.addIceCandidate(new RTCIceCandidate(c));
@@ -174,6 +156,18 @@ exports._onsignalingstatechange = function(f) {
         return function() {
             pc.signalingstatechange = function() {
                 f(pc.signalingstatechange)();
+            };
+        };
+    };
+};
+
+exports._onicecandidate = function(f) {
+    return function(pc) {
+        return function() {
+            pc.onicecandidate = function(event) {
+                if (event.candidate) {
+                  f(event.candidate)();
+                }
             };
         };
     };
