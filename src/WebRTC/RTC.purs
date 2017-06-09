@@ -286,18 +286,25 @@ onsignalingstatechange f = _onsignalingstatechange \state ->
     Left err -> throwException $ error $ show err
 
 foreign import _onicecandidate
-  :: forall e. (Foreign -> Eff e Unit) ->
-               RTCPeerConnection ->
-               Eff e Unit
+  :: forall e a
+   . (a -> Maybe a)
+  -> (Maybe a)
+  -> (Maybe Foreign -> Eff e Unit)
+  -> RTCPeerConnection
+  -> Eff e Unit
 
 onicecandidate
-  :: forall e. (RTCIceCandidate -> Eff (exception :: EXCEPTION | e) Unit) ->
+  :: forall e. (Maybe RTCIceCandidate -> Eff (exception :: EXCEPTION | e) Unit) ->
                RTCPeerConnection ->
                Eff (exception :: EXCEPTION | e) Unit
-onicecandidate f = _onicecandidate \cand ->
-  case runExcept $ decode cand of
-    Right s  -> f s
-    Left err -> throwException $ error $ show err
+onicecandidate f = _onicecandidate Just Nothing \mCand -> do
+  cand <- case mCand of
+    Just cand ->
+      case runExcept $ decode cand of
+        Right cand -> pure $ Just cand
+        Left err   -> throwException $ error $ show err
+    Nothing -> pure Nothing
+  f cand
 
 foreign import _getSignalingState
   :: RTCPeerConnection -> Foreign

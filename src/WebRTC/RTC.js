@@ -33,6 +33,9 @@ exports._createOffer = function(success) {
         return function(pc) {
             return function() {
                 pc.createOffer(
+                    { offerToReceiveAudio: 1,
+                      offerToReceiveVideo: 1 }
+                ).then(
                     function(desc) {
                         success(desc)();
                     },
@@ -68,7 +71,7 @@ exports._setLocalDescription = function(success) {
             return function(pc) {
                 return function() {
                     pc.setLocalDescription(
-                        desc,
+                        new RTCSessionDescription(desc),
                         success,
                         function(e) {
                             error(e)();
@@ -144,7 +147,7 @@ exports.onmessageChannel = function(f) {
 exports._oniceconnectionstatechange = function(f) {
     return function(pc) {
         return function() {
-            pc.iceconnectionstatechange = function() {
+            pc.oniceconnectionstatechange = function() {
                 f(pc.iceConnectionState)();
             };
         };
@@ -154,23 +157,29 @@ exports._oniceconnectionstatechange = function(f) {
 exports._onsignalingstatechange = function(f) {
     return function(pc) {
         return function() {
-            pc.signalingstatechange = function() {
-                f(pc.signalingstatechange)();
+            pc.onsignalingstatechange = function(evt) {
+                f(pc.signalingState)();
             };
         };
     };
 };
 
-exports._onicecandidate = function(f) {
-    return function(pc) {
+exports._onicecandidate = function(Just) {
+  return function(Nothing) {
+    return function(f) {
+      return function(pc) {
         return function() {
-            pc.onicecandidate = function(event) {
-                if (event.candidate) {
-                  f(event.candidate)();
-                }
-            };
+          pc.onicecandidate = function(event) {
+            if (event.candidate) {
+              f(Just(event.candidate))();
+            } else {
+              f(Nothing)();
+            }
+          };
         };
+      };
     };
+  };
 };
 
 exports._getSignalingState = function(pc) {
