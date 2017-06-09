@@ -263,13 +263,13 @@ foreign import _oniceconnectionstatechange
                Eff e Unit
 
 oniceconnectionstatechange
-  :: forall e. (RTCIceConnectionState -> Eff e Unit) ->
+  :: forall e. (RTCIceConnectionState -> Eff (exception :: EXCEPTION | e) Unit) ->
                RTCPeerConnection ->
-               Eff e Unit
+               Eff (exception :: EXCEPTION | e) Unit
 oniceconnectionstatechange f = _oniceconnectionstatechange \state ->
   case runExcept $ decode state of
-    Right s -> f s
-    _       -> pure unit
+    Right s  -> f s
+    Left err -> throwException $ error $ show err
 
 foreign import _onsignalingstatechange
   :: forall e. (Foreign -> Eff e Unit) ->
@@ -277,13 +277,13 @@ foreign import _onsignalingstatechange
                Eff e Unit
 
 onsignalingstatechange
-  :: forall e. (RTCSignalingState -> Eff e Unit) ->
+  :: forall e. (RTCSignalingState -> Eff (exception :: EXCEPTION | e) Unit) ->
                RTCPeerConnection ->
-               Eff e Unit
+               Eff (exception :: EXCEPTION | e) Unit
 onsignalingstatechange f = _onsignalingstatechange \state ->
   case runExcept $ decode state of
-    Right s -> f s
-    _       -> pure unit
+    Right s  -> f s
+    Left err -> throwException $ error $ show err
 
 foreign import _onicecandidate
   :: forall e. (Foreign -> Eff e Unit) ->
@@ -291,13 +291,13 @@ foreign import _onicecandidate
                Eff e Unit
 
 onicecandidate
-  :: forall e. (RTCIceCandidate -> Eff e Unit) ->
+  :: forall e. (RTCIceCandidate -> Eff (exception :: EXCEPTION | e) Unit) ->
                RTCPeerConnection ->
-               Eff e Unit
+               Eff (exception :: EXCEPTION | e) Unit
 onicecandidate f = _onicecandidate \cand ->
   case runExcept $ decode cand of
-    Right s -> f s
-    _       -> pure unit
+    Right s  -> f s
+    Left err -> throwException $ error $ show err
 
 foreign import _getSignalingState
   :: RTCPeerConnection -> Foreign
