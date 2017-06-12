@@ -66,7 +66,7 @@ instance encodeRTCIceCandidate :: Encode RTCIceCandidate where
 instance decodeRTCIceCandidate :: Decode RTCIceCandidate where
   decode f = RTCIceCandidate <$> do
     { candidate: _, sdpMid: _, sdpMLineIndex: _ }
-      <$> (readString =<< readProp "sdpMid" f)
+      <$> (readString =<< readProp "candidate" f)
       <*> (maybe (pure Nothing) (map Just <<< readString) =<< readPropMaybe "sdpMid" f)
       <*> (maybe (pure Nothing) (map Just <<< readInt) =<< readPropMaybe "sdpMLineIndex" f)
 
