@@ -38,7 +38,7 @@ import Data.Generic (class Generic)
 import Data.Newtype (unwrap, wrap, class Newtype)
 import Data.Nullable (Nullable)
 import Data.Either (Either(..), fromRight)
-import Data.Foreign.Index (readProp, class Index, hasOwnProperty)
+import Data.Foreign.Index (readProp, class Index)
 import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
                       readNullOrUndefined, readInt)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
@@ -71,7 +71,7 @@ instance decodeRTCIceCandidate :: Decode RTCIceCandidate where
       <*> (maybe (pure Nothing) (map Just <<< readInt) =<< readPropMaybe "sdpMLineIndex" f)
 
 readPropMaybe :: String -> Foreign -> F (Maybe Foreign)
-readPropMaybe k v | hasOwnProperty k v = readNullOrUndefined =<< readProp k v
+readPropMaybe k v = readNullOrUndefined =<< readProp k v
 readPropMaybe _ _ = pure Nothing
 
 data RTCSignalingState
