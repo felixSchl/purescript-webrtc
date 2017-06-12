@@ -54,6 +54,8 @@ data RTCIceCandidate = RTCIceCandidate
   , candidate :: String
   }
 
+derive instance genericRTCIceCandidate :: Generic RTCIceCandidate
+
 instance encodeRTCIceCandidate :: Encode RTCIceCandidate where
   encode (RTCIceCandidate cand) = toForeign
     { sdpMLineIndex: maybe undefined toForeign cand.sdpMLineIndex
