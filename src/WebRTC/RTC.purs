@@ -23,6 +23,7 @@ module WebRTC.RTC (
 , onicecandidate
 , onaddstream
 , onsignalingstatechange
+, onnegotiationneeded
 , getSignalingState
 , getIceConnectionState
 , rtcSessionDescription
@@ -286,6 +287,12 @@ onsignalingstatechange f = _onsignalingstatechange \state ->
   case runExcept $ decode state of
     Right s  -> f s
     Left err -> throwException $ error $ show err
+
+foreign import onnegotiationneeded
+  :: forall e a
+   . Eff e Unit
+  -> RTCPeerConnection
+  -> Eff e Unit
 
 foreign import _onicecandidate
   :: forall e a

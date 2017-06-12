@@ -182,6 +182,16 @@ exports._onicecandidate = function(Just) {
   };
 };
 
+exports.onnegotiationneeded = function(f) {
+  return function(pc) {
+    return function() {
+      pc.onnegotiationneeded = function(event) {
+        f();
+      };
+    };
+  };
+};
+
 exports._getSignalingState = function(pc) {
   return pc.signalingState;
 };
