@@ -11,6 +11,7 @@ module WebRTC.RTC (
 , RTCIceConnectionState(..)
 , newRTCPeerConnection
 , addStream
+, removeStream
 , createOffer
 , createAnswer
 , setLocalDescription
@@ -176,6 +177,9 @@ foreign import newRTCPeerConnection
   :: forall e. Ice -> Eff e RTCPeerConnection
 
 foreign import addStream
+  :: forall e. MediaStream -> RTCPeerConnection -> Eff e Unit
+
+foreign import removeStream
   :: forall e. MediaStream -> RTCPeerConnection -> Eff e Unit
 
 foreign import _addIceCandidate

@@ -18,6 +18,14 @@ exports.addStream = function(stream) {
     };
 };
 
+exports.removeStream = function(stream) {
+    return function(pc) {
+        return function() {
+            pc.removeStream(stream);
+        };
+    };
+};
+
 exports.onaddstream = function(f) {
     return function(pc) {
         return function() {
