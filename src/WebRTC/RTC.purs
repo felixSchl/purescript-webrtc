@@ -36,7 +36,7 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
 import Control.Monad.Except (runExcept, throwError)
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
-import Data.Generic (class Generic)
+import Data.Generic (class Generic, gShow)
 import Data.Newtype (unwrap, wrap, class Newtype)
 import Data.Nullable (Nullable)
 import Data.Either (Either(..), fromRight)
@@ -57,6 +57,11 @@ data RTCIceCandidate = RTCIceCandidate
   }
 
 derive instance genericRTCIceCandidate :: Generic RTCIceCandidate
+derive instance eqRTCIceCandidate :: Eq RTCIceCandidate
+derive instance ordRTCIceCandidate :: Ord RTCIceCandidate
+
+instance showRTCIceCandidate :: Show RTCIceCandidate where
+  show = gShow
 
 instance encodeRTCIceCandidate :: Encode RTCIceCandidate where
   encode (RTCIceCandidate cand) = toForeign
@@ -83,6 +88,13 @@ data RTCSignalingState
   | RTCSignalingStateHaveLocalPranswer
   | RTCSignalingStateHaveRemotePranswer
 
+derive instance genericRTCSignalingState :: Generic RTCSignalingState
+derive instance eqRTCSignalingState :: Eq RTCSignalingState
+derive instance ordRTCSignalingState :: Ord RTCSignalingState
+
+instance showRTCSignalingState :: Show RTCSignalingState where
+  show = gShow
+
 instance encodeRTCSignalingState :: Encode RTCSignalingState where
   encode RTCSignalingStateStable             = encode "stable"
   encode RTCSignalingStateHaveLocalOffer     = encode "have-local-offer"
@@ -107,6 +119,13 @@ data RTCIceConnectionState
   | RTCIceConnectionStateFailed
   | RTCIceConnectionStateDisconnected
   | RTCIceConnectionStateClosed
+
+derive instance genericRTCIceConnectionState :: Generic RTCIceConnectionState
+derive instance eqRTCIceConnectionState :: Eq RTCIceConnectionState
+derive instance ordRTCIceConnectionState :: Ord RTCIceConnectionState
+
+instance showRTCIceConnectionState :: Show RTCIceConnectionState where
+  show = gShow
 
 instance encodeRTCIceConnectionState :: Encode RTCIceConnectionState where
   encode RTCIceConnectionStateNew          = encode "new"
@@ -133,6 +152,13 @@ data RTCSdpType
   | RTCSdpTypeOffer
   | RTCSdpTypePranswer
   | RTCSdpTypeRollback
+
+derive instance genericRTCSdpType :: Generic RTCSdpType
+derive instance eqRTCSdpType :: Eq RTCSdpType
+derive instance ordRTCSdpType :: Ord RTCSdpType
+
+instance showRTCSdpType :: Show RTCSdpType where
+  show = gShow
 
 instance encodeRTCSdpType :: Encode RTCSdpType where
   encode RTCSdpTypeAnswer   = encode "answer"
