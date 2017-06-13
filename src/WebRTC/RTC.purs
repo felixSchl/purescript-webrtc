@@ -87,6 +87,7 @@ data RTCSignalingState
   | RTCSignalingStateHaveRemoteOffer
   | RTCSignalingStateHaveLocalPranswer
   | RTCSignalingStateHaveRemotePranswer
+  | RTCSignalingStateUnknown String
 
 derive instance genericRTCSignalingState :: Generic RTCSignalingState
 derive instance eqRTCSignalingState :: Eq RTCSignalingState
@@ -101,6 +102,7 @@ instance encodeRTCSignalingState :: Encode RTCSignalingState where
   encode RTCSignalingStateHaveRemoteOffer    = encode "have-remote-offer"
   encode RTCSignalingStateHaveLocalPranswer  = encode "have-local-pranswer"
   encode RTCSignalingStateHaveRemotePranswer = encode "have-remote-pranswer"
+  encode (RTCSignalingStateUnknown state)    = encode state
 
 instance decodeRTCSignalingState :: Decode RTCSignalingState where
   decode f = readString f >>= case _ of
@@ -109,7 +111,7 @@ instance decodeRTCSignalingState :: Decode RTCSignalingState where
     "have-remote-offer"    -> pure RTCSignalingStateHaveRemoteOffer
     "have-local-pranswer"  -> pure RTCSignalingStateHaveLocalPranswer
     "have-remote-pranswer" -> pure RTCSignalingStateHaveRemotePranswer
-    state                  -> fail $ ForeignError $ "Invalid signaling state: " <> show state
+    state                  -> pure $ RTCSignalingStateUnknown state
 
 data RTCIceConnectionState
   = RTCIceConnectionStateNew
