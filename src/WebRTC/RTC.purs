@@ -87,6 +87,7 @@ data RTCSignalingState
   | RTCSignalingStateHaveRemoteOffer
   | RTCSignalingStateHaveLocalPranswer
   | RTCSignalingStateHaveRemotePranswer
+  | RTCSignalingStateClosed
   | RTCSignalingStateUnknown String
 
 derive instance genericRTCSignalingState :: Generic RTCSignalingState
@@ -102,6 +103,7 @@ instance encodeRTCSignalingState :: Encode RTCSignalingState where
   encode RTCSignalingStateHaveRemoteOffer    = encode "have-remote-offer"
   encode RTCSignalingStateHaveLocalPranswer  = encode "have-local-pranswer"
   encode RTCSignalingStateHaveRemotePranswer = encode "have-remote-pranswer"
+  encode RTCSignalingStateClosed             = encode "closed"
   encode (RTCSignalingStateUnknown state)    = encode state
 
 instance decodeRTCSignalingState :: Decode RTCSignalingState where
@@ -111,6 +113,7 @@ instance decodeRTCSignalingState :: Decode RTCSignalingState where
     "have-remote-offer"    -> pure RTCSignalingStateHaveRemoteOffer
     "have-local-pranswer"  -> pure RTCSignalingStateHaveLocalPranswer
     "have-remote-pranswer" -> pure RTCSignalingStateHaveRemotePranswer
+    "closed"               -> pure RTCSignalingStateClosed
     state                  -> pure $ RTCSignalingStateUnknown state
 
 data RTCIceConnectionState
