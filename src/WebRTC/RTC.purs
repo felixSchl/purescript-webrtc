@@ -23,6 +23,7 @@ module WebRTC.RTC (
 , oniceconnectionstatechange
 , onicecandidate
 , onaddstream
+, onremovestream
 , onsignalingstatechange
 , onnegotiationneeded
 , getSignalingState
@@ -228,6 +229,11 @@ addIceCandidate = _addIceCandidate <<< encode
 type MediaStreamEvent = { stream :: MediaStream }
 
 foreign import onaddstream
+  :: forall e. (MediaStreamEvent -> Eff e Unit) ->
+               RTCPeerConnection ->
+               Eff e Unit
+
+foreign import onremovestream
   :: forall e. (MediaStreamEvent -> Eff e Unit) ->
                RTCPeerConnection ->
                Eff e Unit

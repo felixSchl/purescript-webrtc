@@ -8,13 +8,18 @@ module WebRTC.MediaStream (
 , createObjectURL
 ) where
 
-import Prelude (Unit())
+import Prelude (Unit(), class Eq)
 import Unsafe.Coerce (unsafeCoerce)
 import Control.Monad.Aff (Aff(), makeAff)
 import Control.Monad.Eff (Eff(), kind Effect)
 import Control.Monad.Eff.Exception (Error())
 
+foreign import refEq :: ∀ a. a -> a -> Boolean
+
 foreign import data MediaStream :: Type
+
+instance eqMediaStream :: Eq MediaStream where
+  eq = refEq
 
 foreign import _getUserMedia
   :: forall e. (MediaStream -> Eff e Unit) ->

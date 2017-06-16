@@ -36,6 +36,16 @@ exports.onaddstream = function(f) {
     };
 };
 
+exports.onremovestream = function(f) {
+    return function(pc) {
+        return function() {
+            pc.onremovestream = function(event) {
+                f(event)();
+            };
+        };
+    };
+};
+
 exports._createOffer = function(success) {
     return function(error) {
         return function(pc) {

@@ -24,3 +24,9 @@ exports.createObjectURL = function(blob) {
         return URL.createObjectURL(blob);
     };
 };
+
+exports.refEq = function(a) {
+  return function(b) {
+    return a === b;
+  }
+}
