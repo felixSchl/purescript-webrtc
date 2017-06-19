@@ -203,7 +203,13 @@ instance decodeRTCSessionDescription :: Decode RTCSessionDescription where
 
 foreign import data RTCPeerConnection :: Type
 
-type Ice = { iceServers :: Array { url :: String } }
+type Ice = {
+    iceServers :: Array {
+      url :: String
+    , credential :: Nullable String
+    , username :: Nullable String
+    }
+  }
 
 foreign import newRTCPeerConnection
   :: forall e. Ice -> Eff e RTCPeerConnection
