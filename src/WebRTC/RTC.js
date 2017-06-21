@@ -152,6 +152,12 @@ exports.send = function(s) {
     };
 };
 
+exports.close = function(pc) {
+    return function() {
+        pc.close()
+    };
+};
+
 exports.onmessageChannel = function(f) {
     return function(dc) {
         return function() {

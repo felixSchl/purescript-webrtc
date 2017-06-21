@@ -29,6 +29,7 @@ module WebRTC.RTC (
 , getSignalingState
 , getIceConnectionState
 , rtcSessionDescription
+, close
 ) where
 
 import WebRTC.MediaStream
@@ -221,9 +222,7 @@ foreign import removeStream
   :: forall e. MediaStream -> RTCPeerConnection -> Eff e Unit
 
 foreign import _addIceCandidate
-  :: forall e. Foreign ->
-               RTCPeerConnection ->
-               Eff e Unit
+  :: forall e. Foreign -> RTCPeerConnection -> Eff e Unit
 
 addIceCandidate
   :: ∀ e
@@ -300,6 +299,10 @@ foreign import createDataChannel
 foreign import send
   :: forall e. String ->
                RTCDataChannel ->
+               Eff e Unit
+
+foreign import close
+  :: forall e. RTCPeerConnection ->
                Eff e Unit
 
 foreign import onmessageChannel
