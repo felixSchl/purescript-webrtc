@@ -32,7 +32,6 @@ module WebRTC.RTC (
 , close
 ) where
 
-import WebRTC.MediaStream
 import Control.Monad.Aff (Aff, makeAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
@@ -50,9 +49,11 @@ import Data.Foreign.NullOrUndefined (undefined)
 import Partial.Unsafe (unsafePartial)
 import Prelude
 
+import WebRTC.MediaStream
+
 foreign import data IceEvent :: Type
 
-data RTCIceCandidate = RTCIceCandidate
+newtype RTCIceCandidate = RTCIceCandidate
   { sdpMLineIndex :: Maybe Int
   , sdpMid :: Maybe String
   , candidate :: String
