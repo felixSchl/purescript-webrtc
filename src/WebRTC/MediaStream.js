@@ -30,3 +30,11 @@ exports.refEq = function(a) {
     return a === b;
   }
 }
+
+exports._getMediaStreamTrackKind = function(t) {
+  return t.kind;
+}
+
+exports.getMediaStreamTracks = function(t) {
+  return t.getTracks();
+}

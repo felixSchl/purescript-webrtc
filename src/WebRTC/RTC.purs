@@ -29,6 +29,7 @@ module WebRTC.RTC (
 , getSignalingState
 , getIceConnectionState
 , rtcSessionDescription
+, getStats
 , close
 ) where
 
@@ -37,19 +38,23 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
 import Control.Monad.Except (runExcept, throwError)
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
+import Data.Traversable (traverse)
 import Data.Generic (class Generic, gShow)
 import Data.Newtype (unwrap, wrap, class Newtype)
 import Data.Nullable (Nullable)
 import Data.Either (Either(..), fromRight)
 import Data.Foreign.Index (readProp, class Index)
 import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
-                      readNullOrUndefined, readInt)
+                      readNullOrUndefined, readInt, readArray)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
 import Data.Foreign.NullOrUndefined (undefined)
+import Data.Foreign.Keys (keys)
 import Partial.Unsafe (unsafePartial)
+import Debug.Trace
 import Prelude
 
 import WebRTC.MediaStream
+import WebRTC.Stats
 
 foreign import data IceEvent :: Type
 
@@ -381,3 +386,28 @@ getIceConnectionState :: ∀ eff. RTCPeerConnection -> Eff (exception :: EXCEPTI
 getIceConnectionState pc = case runExcept $ decode $ _getIceConnectionState pc of
                             Left err -> throwException (error $ show err)
                             Right v -> pure v
+
+foreign import _getStats
+  :: ∀ eff
+   . (Foreign -> Eff eff Unit)
+  -> (Error -> Eff eff Unit)
+  -> Foreign
+  -> RTCPeerConnection
+  -> Eff eff Unit
+
+foreign import _null :: Foreign
+
+getStats
+  :: ∀ eff
+   . Maybe MediaStreamTrack
+  -> RTCPeerConnection
+  -> Aff (exception :: EXCEPTION | eff) (Array RTCStats)
+getStats mTrack pc = do
+  o <- makeAff (\e s -> _getStats s e (maybe _null toForeign mTrack) pc)
+  case runExcept $ go o of
+       Left err -> throwError (error $ show err)
+       Right v  -> pure v
+  where
+  go o = readArray o >>= traverse \x -> do
+            traceAnyA x
+            decode x

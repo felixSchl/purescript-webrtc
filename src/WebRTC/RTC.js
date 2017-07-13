@@ -66,6 +66,46 @@ exports._createOffer = function(success) {
     };
 };
 
+exports._null = null;
+
+exports._getStats = function(success) {
+    return function(error) {
+        return function(track) {
+            return function(pc) {
+                return function() {
+                    pc.getStats()
+                      .then(
+                        function(stats) {
+                            var xs = [];
+                            stats.forEach(function(x) {
+                              if (!(
+                                 x.type == "certificate"
+                              || x.type == "codec"
+                              || x.type == "candidate-pair"
+                              || x.type == "local-candidate"
+                              || x.type == "remote-candidate"
+                              || x.type == "inbound-rtp"
+                              || x.type == "outbound-rtp"
+                              || x.type == "track"
+                              || x.type == "stream"
+                              || x.type == "peer-connection"
+                              || x.type == "transport"
+                              )) {
+                                xs.push(x);
+                              }
+                            });
+                            success(xs)();
+                        },
+                        function(e) {
+                            error(e)();
+                        }
+                    );
+                };
+            };
+        };
+    };
+};
+
 exports._createAnswer = function(success) {
     return function(error) {
         return function(pc) {

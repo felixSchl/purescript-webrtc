@@ -1,18 +1,23 @@
 module WebRTC.MediaStream (
   MediaStream(..)
+, MediaStreamTrack(..)
+, MediaStreamTrackKind(..)
 , MediaStreamConstraints(..)
 , Blob(..)
 , USER_MEDIA()
 , getUserMedia
 , mediaStreamToBlob
 , createObjectURL
+, getMediaStreamTrackKind
+, getMediaStreamTracks
 ) where
 
-import Prelude (Unit(), class Eq)
+import Prelude
 import Unsafe.Coerce (unsafeCoerce)
 import Control.Monad.Aff (Aff(), makeAff)
 import Control.Monad.Eff (Eff(), kind Effect)
 import Control.Monad.Eff.Exception (Error())
+import Partial.Unsafe (unsafePartial)
 
 foreign import refEq :: ∀ a. a -> a -> Boolean
 
@@ -44,3 +49,20 @@ mediaStreamToBlob = unsafeCoerce
 
 foreign import createObjectURL
   :: forall e. Blob -> Eff e String
+
+foreign import data MediaStreamTrack :: Type
+
+data MediaStreamTrackKind
+  = MediaStreamTrackKindVideo
+  | MediaStreamTrackKindAudio
+
+derive instance eqMediaStreamTrackKind :: Eq MediaStreamTrackKind
+
+foreign import getMediaStreamTracks :: MediaStream -> Array MediaStreamTrack
+
+foreign import _getMediaStreamTrackKind :: MediaStreamTrack -> String
+
+getMediaStreamTrackKind :: MediaStreamTrack -> MediaStreamTrackKind
+getMediaStreamTrackKind t = unsafePartial $ case _getMediaStreamTrackKind t of
+  "audio" -> MediaStreamTrackKindAudio
+  "video" -> MediaStreamTrackKindVideo
