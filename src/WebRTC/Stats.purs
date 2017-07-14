@@ -113,7 +113,7 @@ data RTCStats
         , localCandidateId :: String
         , remoteCandidateId :: String
         , state :: RTCStatsIceCandidatePairState
-        , priority :: Int
+        , priority :: Number
         , nominated :: Boolean
         , writable :: Boolean
         , readable :: Maybe Boolean
@@ -151,7 +151,7 @@ type RTCIceCandidateStatsObj = BaseRTCStats
   , port :: Int
   , protocol :: String
   , candidateType :: RTCIceCandidateType
-  , priority :: Int
+  , priority :: Number
   , url :: Maybe String
   , deleted :: Boolean -- (default: false)
   )
