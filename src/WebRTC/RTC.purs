@@ -37,6 +37,7 @@ import Control.Monad.Aff (Aff, makeAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
 import Control.Monad.Except (runExcept, throwError)
+import Control.Alt ((<|>))
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.Traversable (traverse)
 import Data.Generic (class Generic, gShow)
@@ -82,12 +83,13 @@ instance decodeRTCIceCandidate :: Decode RTCIceCandidate where
   decode f = RTCIceCandidate <$> do
     { candidate: _, sdpMid: _, sdpMLineIndex: _ }
       <$> (readString =<< readProp "candidate" f)
-      <*> (maybe (pure Nothing) (map Just <<< readString) =<< readPropMaybe "sdpMid" f)
-      <*> (maybe (pure Nothing) (map Just <<< readInt) =<< readPropMaybe "sdpMLineIndex" f)
+      <*> (readPropMaybe "sdpMid" f)
+      <*> (readPropMaybe "sdpMLineIndex" f)
 
-readPropMaybe :: String -> Foreign -> F (Maybe Foreign)
-readPropMaybe k v = readNullOrUndefined =<< readProp k v
-readPropMaybe _ _ = pure Nothing
+readPropMaybe :: ∀ a. Decode a => String -> Foreign -> F (Maybe a)
+readPropMaybe k v = do
+  p <- readProp k v
+  (Nothing <$ readNullOrUndefined p) <|> (Just <$> decode p)
 
 data RTCSignalingState
   = RTCSignalingStateStable
@@ -408,6 +410,4 @@ getStats mTrack pc = do
        Left err -> throwError (error $ show err)
        Right v  -> pure v
   where
-  go o = readArray o >>= traverse \x -> do
-            traceAnyA x
-            decode x
+  go o = readArray o >>= traverse decode

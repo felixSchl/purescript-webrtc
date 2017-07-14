@@ -1,48 +1,64 @@
 module WebRTC.Stats where
 
 import Data.Either (Either(..))
-import Data.Foreign.Index (readProp, class Index)
+import Data.Bifunctor (lmap)
+import Data.Foreign.Index (readProp, class Index, errorAt)
+import Control.Alt ((<|>))
+import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
                       readNullOrUndefined, readInt)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
+import Control.Monad.Except (mapExcept)
+import Debug.Trace
 import Prelude
+
+readPropMaybe :: ∀ a. Decode a => String -> Foreign -> F (Maybe a)
+readPropMaybe k v = do
+  p <- readProp k v
+  (Nothing <$ readNullOrUndefined p) <|> (Just <$> decode p)
 
 data RTCStats
   = RTCStatsCodec
       (BaseRTCStats
         ( payloadType :: Int
-        , codec :: String
+        , codec :: Maybe String
+        , mimeType :: Maybe String
         , clockRate :: Int
-        , channels :: Int
-        , parameters :: String
-        , implementation :: String
+        , channels :: Maybe Int
+        , parameters :: Maybe String
+        , implementation :: Maybe String
+        ))
+  | RTCStatsStream
+      (BaseRTCStats
+        ( streamIdentifier :: String
+        , trackIds :: Array String
         ))
   | RTCStatsInboundRtp
       (BaseRTCRTPStreamStats
         ( packetsReceived :: Int
         , bytesReceived :: Int
         , packetsLost :: Int
-        , jitter :: Number
-        , fractionLost :: Number
-        , packetsDiscarded :: Int
-        , packetsRepaired :: Int
-        , burstPacketsLost :: Int
-        , burstPacketsDiscarded :: Int
-        , burstLossCount :: Int
-        , burstDiscardCount :: Int
-        , burstLossRate :: Number
-        , burstDiscardRate :: Number
-        , gapLossRate :: Number
-        , gapDiscardRate :: Number
-        , framesDecoded :: Int
+        , jitter :: Maybe Number
+        , fractionLost :: Maybe Number
+        , packetsDiscarded :: Maybe Int
+        , packetsRepaired :: Maybe Int
+        , burstPacketsLost :: Maybe Int
+        , burstPacketsDiscarded :: Maybe Int
+        , burstLossCount :: Maybe Int
+        , burstDiscardCount :: Maybe Int
+        , burstLossRate :: Maybe Number
+        , burstDiscardRate :: Maybe Number
+        , gapLossRate :: Maybe Number
+        , gapDiscardRate :: Maybe Number
+        , framesDecoded :: Maybe Int
         ))
   | RTCStatsOutboundRtp
       (BaseRTCRTPStreamStats
         ( packetsSent :: Int
         , bytesSent :: Int
-        , targetBitrate :: Number
-        , roundTripTime :: Number
-        , framesEncoded :: Int
+        , targetBitrate :: Maybe Number
+        , roundTripTime :: Maybe Number
+        , framesEncoded :: Maybe Int
         ))
   | RTCStatsPeerConnection
       (BaseRTCStats
@@ -66,27 +82,27 @@ data RTCStats
         , remoteSource :: Boolean
         , ended :: Boolean
         , detached :: Boolean
-        , ssrcIds :: Array String
-        , frameWidth :: Int
-        , frameHeight :: Int
-        , framesPerSecond :: Number
-        , framesSent :: Int
-        , framesReceived :: Int
-        , framesDecoded :: Int
-        , framesDropped :: Int
-        , framesCorrupted :: Int
-        , partialFramesLost :: Int
-        , fullFramesLost :: Int
-        , audioLevel :: Number
-        , echoReturnLoss :: Number
-        , echoReturnLossEnhancement :: Number
+        , ssrcIds :: Maybe (Array String)
+        , frameWidth :: Maybe Int
+        , frameHeight :: Maybe Int
+        , framesPerSecond :: Maybe Number
+        , framesSent :: Maybe Int
+        , framesReceived :: Maybe Int
+        , framesDecoded :: Maybe Int
+        , framesDropped :: Maybe Int
+        , framesCorrupted :: Maybe Int
+        , partialFramesLost :: Maybe Int
+        , fullFramesLost :: Maybe Int
+        , audioLevel :: Maybe Number
+        , echoReturnLoss :: Maybe Number
+        , echoReturnLossEnhancement :: Maybe Number
         ))
   | RTCStatsTransport
       (BaseRTCStats
         ( bytesSent :: Int
         , bytesReceived :: Int
-        , rtcpTransportStatsId :: String
-        , activeConnection :: Boolean
+        , rtcpTransportStatsId :: Maybe String
+        , activeConnection :: Maybe Boolean
         , selectedCandidatePairId :: String
         , localCertificateId :: String
         , remoteCertificateId :: String
@@ -100,23 +116,23 @@ data RTCStats
         , priority :: Int
         , nominated :: Boolean
         , writable :: Boolean
-        , readable :: Boolean
+        , readable :: Maybe Boolean
         , bytesSent :: Int
         , bytesReceived :: Int
         , totalRoundTripTime :: Number
-        , currentRoundTripTime :: Number
-        , availableOutgoingBitrate :: Number
-        , availableIncomingBitrate :: Number
-        , requestsReceived :: Int
-        , requestsSent :: Int
-        , responsesReceived :: Int
-        , responsesSent :: Int
-        , retransmissionsReceived :: Int
-        , retransmissionsSent :: Int
-        , consentRequestsReceived :: Int
-        , consentRequestsSent :: Int
-        , consentResponsesReceived :: Int
-        , consentResponsesSent :: Int
+        , currentRoundTripTime :: Maybe Number
+        , availableOutgoingBitrate :: Maybe Number
+        , availableIncomingBitrate :: Maybe Number
+        , requestsReceived :: Maybe Int
+        , requestsSent :: Maybe Int
+        , responsesReceived :: Maybe Int
+        , responsesSent :: Maybe Int
+        , retransmissionsReceived :: Maybe Int
+        , retransmissionsSent :: Maybe Int
+        , consentRequestsReceived :: Maybe Int
+        , consentRequestsSent :: Maybe Int
+        , consentResponsesReceived :: Maybe Int
+        , consentResponsesSent :: Maybe Int
         ))
   | RTCStatsLocalCandidate RTCIceCandidateStatsObj
   | RTCStatsRemoteCandidate RTCIceCandidateStatsObj
@@ -125,7 +141,7 @@ data RTCStats
         ( fingerprint :: String
         , fingerprintAlgorithm :: String
         , base64Certificate :: String
-        , issuerCertificateId :: String
+        , issuerCertificateId :: Maybe String
         ))
 
 type RTCIceCandidateStatsObj = BaseRTCStats
@@ -136,34 +152,51 @@ type RTCIceCandidateStatsObj = BaseRTCStats
   , protocol :: String
   , candidateType :: RTCIceCandidateType
   , priority :: Int
-  , url :: String
+  , url :: Maybe String
   , deleted :: Boolean -- (default: false)
   )
+
+mapErrorAt prop = mapExcept (lmap (map (errorAt prop)))
 
 instance decodeRTCStats :: Decode RTCStats where
   decode o =
    let
     r :: ∀ a. Decode a => String -> F a
-    r k = decode =<< readProp k o
-   in readProp "type" o >>= readString >>= case _ of
+    r k = mapErrorAt k $ decode =<< readProp k o
+
+    rM :: ∀ a. Decode a => String -> F (Maybe a)
+    rM k = mapErrorAt k $ readPropMaybe k o
+   in r "type" >>= case _ of
       "codec" -> RTCStatsCodec <$> do
         { timestamp: _
         , id: _
         , payloadType: _
         , codec: _
+        , mimeType: _
         , clockRate: _
         , channels: _
         , parameters: _
         , implementation: _
         }
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> r  "payloadType"
+          <*> rM "codec"
+          <*> rM "mimeType"
+          <*> r  "clockRate"
+          <*> rM "channels"
+          <*> rM "parameters"
+          <*> rM "implementation"
+      "stream" -> RTCStatsStream <$> do
+        { timestamp: _
+        , id: _
+        , streamIdentifier: _
+        , trackIds: _
+        }
           <$> r "timestamp"
           <*> r "id"
-          <*> r "payloadType"
-          <*> r "codec"
-          <*> r "clockRate"
-          <*> r "channels"
-          <*> r "parameters"
-          <*> r "implementation"
+          <*> r "streamIdentifier"
+          <*> r "trackIds"
       "inbound-rtp" -> RTCStatsInboundRtp <$> do
         { timestamp: _
         , id: _
@@ -196,36 +229,36 @@ instance decodeRTCStats :: Decode RTCStats where
         , gapDiscardRate: _
         , framesDecoded: _
         }
-          <$> r "timestamp"
-          <*> r "id"
-          <*> r "ssrc"
-          <*> r "associateStatsId"
-          <*> r "isRemote"
-          <*> r "mediaType"
-          <*> r "mediaTrackId"
-          <*> r "transportId"
-          <*> r "codecId"
-          <*> r "firCount"
-          <*> r "pliCount"
-          <*> r "nackCount"
-          <*> r "sliCount"
-          <*> r "qpSum"
-          <*> r "packetsReceived"
-          <*> r "bytesReceived"
-          <*> r "packetsLost"
-          <*> r "jitter"
-          <*> r "fractionLost"
-          <*> r "packetsDiscarded"
-          <*> r "packetsRepaired"
-          <*> r "burstPacketsLost"
-          <*> r "burstPacketsDiscarded"
-          <*> r "burstLossCount"
-          <*> r "burstDiscardCount"
-          <*> r "burstLossRate"
-          <*> r "burstDiscardRate"
-          <*> r "gapLossRate"
-          <*> r "gapDiscardRate"
-          <*> r "framesDecoded"
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> rM "ssrc"
+          <*> rM "associateStatsId"
+          <*> r  "isRemote"
+          <*> r  "mediaType"
+          <*> rM "mediaTrackId"
+          <*> r  "transportId"
+          <*> rM "codecId"
+          <*> rM "firCount"
+          <*> rM "pliCount"
+          <*> rM "nackCount"
+          <*> rM "sliCount"
+          <*> rM "qpSum"
+          <*> r  "packetsReceived"
+          <*> r  "bytesReceived"
+          <*> r  "packetsLost"
+          <*> rM "jitter"
+          <*> rM "fractionLost"
+          <*> rM "packetsDiscarded"
+          <*> rM "packetsRepaired"
+          <*> rM "burstPacketsLost"
+          <*> rM "burstPacketsDiscarded"
+          <*> rM "burstLossCount"
+          <*> rM "burstDiscardCount"
+          <*> rM "burstLossRate"
+          <*> rM "burstDiscardRate"
+          <*> rM "gapLossRate"
+          <*> rM "gapDiscardRate"
+          <*> rM "framesDecoded"
       "outbound-rtp" -> RTCStatsOutboundRtp <$> do
         { timestamp: _
         , id: _
@@ -247,25 +280,25 @@ instance decodeRTCStats :: Decode RTCStats where
         , roundTripTime: _
         , framesEncoded: _
         }
-          <$> r "timestamp"
-          <*> r "id"
-          <*> r "ssrc"
-          <*> r "associateStatsId"
-          <*> r "isRemote"
-          <*> r "mediaType"
-          <*> r "mediaTrackId"
-          <*> r "transportId"
-          <*> r "codecId"
-          <*> r "firCount"
-          <*> r "pliCount"
-          <*> r "nackCount"
-          <*> r "sliCount"
-          <*> r "qpSum"
-          <*> r "packetsSent"
-          <*> r "bytesSent"
-          <*> r "targetBitrate"
-          <*> r "roundTripTime"
-          <*> r "framesEncoded"
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> rM "ssrc"
+          <*> rM "associateStatsId"
+          <*> r  "isRemote"
+          <*> r  "mediaType"
+          <*> rM "mediaTrackId"
+          <*> r  "transportId"
+          <*> rM "codecId"
+          <*> rM "firCount"
+          <*> rM "pliCount"
+          <*> rM "nackCount"
+          <*> rM "sliCount"
+          <*> rM "qpSum"
+          <*> r  "packetsSent"
+          <*> r  "bytesSent"
+          <*> rM "targetBitrate"
+          <*> rM "roundTripTime"
+          <*> rM "framesEncoded"
       "peer-connection" -> RTCStatsPeerConnection <$> do
         { timestamp: _
         , id: _
@@ -320,26 +353,26 @@ instance decodeRTCStats :: Decode RTCStats where
         , echoReturnLoss: _
         , echoReturnLossEnhancement: _
         }
-          <$> r "timestamp"
-          <*> r "id"
-          <*> r "trackIdentifier"
-          <*> r "remoteSource"
-          <*> r "ended"
-          <*> r "detached"
-          <*> r "ssrcIds"
-          <*> r "frameWidth"
-          <*> r "frameHeight"
-          <*> r "framesPerSecond"
-          <*> r "framesSent"
-          <*> r "framesReceived"
-          <*> r "framesDecoded"
-          <*> r "framesDropped"
-          <*> r "framesCorrupted"
-          <*> r "partialFramesLost"
-          <*> r "fullFramesLost"
-          <*> r "audioLevel"
-          <*> r "echoReturnLoss"
-          <*> r "echoReturnLossEnhancement"
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> r  "trackIdentifier"
+          <*> r  "remoteSource"
+          <*> r  "ended"
+          <*> r  "detached"
+          <*> rM "ssrcIds"
+          <*> rM "frameWidth"
+          <*> rM "frameHeight"
+          <*> rM "framesPerSecond"
+          <*> rM "framesSent"
+          <*> rM "framesReceived"
+          <*> rM "framesDecoded"
+          <*> rM "framesDropped"
+          <*> rM "framesCorrupted"
+          <*> rM "partialFramesLost"
+          <*> rM "fullFramesLost"
+          <*> rM "audioLevel"
+          <*> rM "echoReturnLoss"
+          <*> rM "echoReturnLossEnhancement"
       "transport" -> RTCStatsTransport <$> do
         { timestamp: _
         , id: _
@@ -351,15 +384,15 @@ instance decodeRTCStats :: Decode RTCStats where
         , localCertificateId: _
         , remoteCertificateId: _
         }
-          <$> r "timestamp"
-          <*> r "id"
-          <*> r "bytesSent"
-          <*> r "bytesReceived"
-          <*> r "rtcpTransportStatsId"
-          <*> r "activeConnection"
-          <*> r "selectedCandidatePairId"
-          <*> r "localCertificateId"
-          <*> r "remoteCertificateId"
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> r  "bytesSent"
+          <*> r  "bytesReceived"
+          <*> rM "rtcpTransportStatsId"
+          <*> rM "activeConnection"
+          <*> r  "selectedCandidatePairId"
+          <*> r  "localCertificateId"
+          <*> r  "remoteCertificateId"
       "candidate-pair" -> RTCStatsCandidatePair <$> do
         { timestamp: _
         , id: _
@@ -388,32 +421,32 @@ instance decodeRTCStats :: Decode RTCStats where
         , consentResponsesReceived: _
         , consentResponsesSent: _
         }
-          <$> r "timestamp"
-          <*> r "id"
-          <*> r "transportId"
-          <*> r "localCandidateId"
-          <*> r "remoteCandidateId"
-          <*> r "state"
-          <*> r "priority"
-          <*> r "nominated"
-          <*> r "writable"
-          <*> r "readable"
-          <*> r "bytesSent"
-          <*> r "bytesReceived"
-          <*> r "totalRoundTripTime"
-          <*> r "currentRoundTripTime"
-          <*> r "availableOutgoingBitrate"
-          <*> r "availableIncomingBitrate"
-          <*> r "requestsReceived"
-          <*> r "requestsSent"
-          <*> r "responsesReceived"
-          <*> r "responsesSent"
-          <*> r "retransmissionsReceived"
-          <*> r "retransmissionsSent"
-          <*> r "consentRequestsReceived"
-          <*> r "consentRequestsSent"
-          <*> r "consentResponsesReceived"
-          <*> r "consentResponsesSent"
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> r  "transportId"
+          <*> r  "localCandidateId"
+          <*> r  "remoteCandidateId"
+          <*> r  "state"
+          <*> r  "priority"
+          <*> r  "nominated"
+          <*> r  "writable"
+          <*> rM "readable"
+          <*> r  "bytesSent"
+          <*> r  "bytesReceived"
+          <*> r  "totalRoundTripTime"
+          <*> rM "currentRoundTripTime"
+          <*> rM "availableOutgoingBitrate"
+          <*> rM "availableIncomingBitrate"
+          <*> rM "requestsReceived"
+          <*> rM "requestsSent"
+          <*> rM "responsesReceived"
+          <*> rM "responsesSent"
+          <*> rM "retransmissionsReceived"
+          <*> rM "retransmissionsSent"
+          <*> rM "consentRequestsReceived"
+          <*> rM "consentRequestsSent"
+          <*> rM "consentResponsesReceived"
+          <*> rM "consentResponsesSent"
       "local-candidate" -> RTCStatsLocalCandidate <$> do
         { timestamp: _
         , id: _
@@ -427,17 +460,17 @@ instance decodeRTCStats :: Decode RTCStats where
         , url: _
         , deleted: _
         }
-          <$> r "timestamp"
-          <*> r "id"
-          <*> r "transportId"
-          <*> r "isRemote"
-          <*> r "ip"
-          <*> r "port"
-          <*> r "protocol"
-          <*> r "candidateType"
-          <*> r "priority"
-          <*> r "url"
-          <*> r "deleted"
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> r  "transportId"
+          <*> r  "isRemote"
+          <*> r  "ip"
+          <*> r  "port"
+          <*> r  "protocol"
+          <*> r  "candidateType"
+          <*> r  "priority"
+          <*> rM "url"
+          <*> r  "deleted"
       "remote-candidate" -> RTCStatsRemoteCandidate <$> do
         { timestamp: _
         , id: _
@@ -451,17 +484,17 @@ instance decodeRTCStats :: Decode RTCStats where
         , url: _
         , deleted: _
         }
-          <$> r "timestamp"
-          <*> r "id"
-          <*> r "transportId"
-          <*> r "isRemote"
-          <*> r "ip"
-          <*> r "port"
-          <*> r "protocol"
-          <*> r "candidateType"
-          <*> r "priority"
-          <*> r "url"
-          <*> r "deleted"
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> r  "transportId"
+          <*> r  "isRemote"
+          <*> r  "ip"
+          <*> r  "port"
+          <*> r  "protocol"
+          <*> r  "candidateType"
+          <*> r  "priority"
+          <*> rM "url"
+          <*> r  "deleted"
       "certificate" -> RTCStatsCertificate <$> do
         { timestamp: _
         , id: _
@@ -470,12 +503,12 @@ instance decodeRTCStats :: Decode RTCStats where
         , base64Certificate: _
         , issuerCertificateId: _
         }
-          <$> r "timestamp"
-          <*> r "id"
-          <*> r "fingerprint"
-          <*> r "fingerprintAlgorithm"
-          <*> r "base64Certificate"
-          <*> r "issuerCertificateId"
+          <$> r  "timestamp"
+          <*> r  "id"
+          <*> r  "fingerprint"
+          <*> r  "fingerprintAlgorithm"
+          <*> r  "base64Certificate"
+          <*> rM "issuerCertificateId"
       s -> fail $ ForeignError $ "Unknown stats type: " <> show s
 
 type BaseRTCStats r = Record
@@ -485,25 +518,20 @@ type BaseRTCStats r = Record
   )
 
 type BaseRTCRTPStreamStats r = BaseRTCStats
-  ( ssrc :: String
-  , associateStatsId :: String
+  ( ssrc :: Maybe String
+  , associateStatsId :: Maybe String
   , isRemote :: Boolean -- (default: false)
   , mediaType :: String
-  , mediaTrackId :: String
+  , mediaTrackId :: Maybe String
   , transportId :: String
-  , codecId :: String
-  , firCount :: Int
-  , pliCount :: Int
-  , nackCount :: Int
-  , sliCount :: Int
-  , qpSum :: Int
+  , codecId :: Maybe String
+  , firCount :: Maybe Int
+  , pliCount :: Maybe Int
+  , nackCount :: Maybe Int
+  , sliCount :: Maybe Int
+  , qpSum :: Maybe Int
   | r
   )
-
-newtype RTCMediaStreamStats = RTCMediaStreamStats (BaseRTCStats
-  ( streamIdentifier :: String
-  , trackIds :: Array String
-  ))
 
 data RTCDataChannelState
   = RTCDataChannelStateConnecting
@@ -563,10 +591,11 @@ instance encodeRTCStatsIceCandidatePairState :: Encode RTCStatsIceCandidatePairS
 
 instance decodeRTCStatsIceCandidatePairState :: Decode RTCStatsIceCandidatePairState where
   decode f = readString f >>= case _ of
-    "frozen"     -> pure RTCStatsIceCandidatePairStateFrozen
-    "waiting"    -> pure RTCStatsIceCandidatePairStateWaiting
-    "inprogress" -> pure RTCStatsIceCandidatePairStateInprogress
-    "failed"     -> pure RTCStatsIceCandidatePairStateFailed
-    "succeeded"  -> pure RTCStatsIceCandidatePairStateSucceeded
-    "cancelled"  -> pure RTCStatsIceCandidatePairStateCancelled
-    s            -> fail $ ForeignError $ "Unknown ice candidate state: " <> show s
+    "frozen"      -> pure RTCStatsIceCandidatePairStateFrozen
+    "waiting"     -> pure RTCStatsIceCandidatePairStateWaiting
+    "in-progress" -> pure RTCStatsIceCandidatePairStateInprogress
+    "inprogress"  -> pure RTCStatsIceCandidatePairStateInprogress
+    "failed"      -> pure RTCStatsIceCandidatePairStateFailed
+    "succeeded"   -> pure RTCStatsIceCandidatePairStateSucceeded
+    "cancelled"   -> pure RTCStatsIceCandidatePairStateCancelled
+    s             -> fail $ ForeignError $ "Unknown ice candidate state: " <> show s

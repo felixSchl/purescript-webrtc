@@ -78,21 +78,7 @@ exports._getStats = function(success) {
                         function(stats) {
                             var xs = [];
                             stats.forEach(function(x) {
-                              if (!(
-                                 x.type == "certificate"
-                              || x.type == "codec"
-                              || x.type == "candidate-pair"
-                              || x.type == "local-candidate"
-                              || x.type == "remote-candidate"
-                              || x.type == "inbound-rtp"
-                              || x.type == "outbound-rtp"
-                              || x.type == "track"
-                              || x.type == "stream"
-                              || x.type == "peer-connection"
-                              || x.type == "transport"
-                              )) {
-                                xs.push(x);
-                              }
+                              xs.push(x);
                             });
                             success(xs)();
                         },
