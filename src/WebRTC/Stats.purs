@@ -1,16 +1,16 @@
 module WebRTC.Stats where
 
+import Prelude
 import Data.Either (Either(..))
 import Data.Bifunctor (lmap)
 import Data.Foreign.Index (readProp, class Index, errorAt)
-import Control.Alt ((<|>))
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
                       readNullOrUndefined, readInt)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
+import Control.Alt ((<|>))
 import Control.Monad.Except (mapExcept)
-import Debug.Trace
-import Prelude
+import WebRTC.Candidate
 
 readPropMaybe :: ∀ a. Decode a => String -> Foreign -> F (Maybe a)
 readPropMaybe k v = do
@@ -103,9 +103,9 @@ data RTCStats
         , bytesReceived :: Int
         , rtcpTransportStatsId :: Maybe String
         , activeConnection :: Maybe Boolean
-        , selectedCandidatePairId :: String
-        , localCertificateId :: String
-        , remoteCertificateId :: String
+        , selectedCandidatePairId :: Maybe String
+        , localCertificateId :: Maybe String
+        , remoteCertificateId :: Maybe String
         ))
   | RTCStatsCandidatePair
       (BaseRTCStats
@@ -390,9 +390,9 @@ instance decodeRTCStats :: Decode RTCStats where
           <*> r  "bytesReceived"
           <*> rM "rtcpTransportStatsId"
           <*> rM "activeConnection"
-          <*> r  "selectedCandidatePairId"
-          <*> r  "localCertificateId"
-          <*> r  "remoteCertificateId"
+          <*> rM "selectedCandidatePairId"
+          <*> rM "localCertificateId"
+          <*> rM "remoteCertificateId"
       "candidate-pair" -> RTCStatsCandidatePair <$> do
         { timestamp: _
         , id: _
@@ -552,26 +552,6 @@ instance decodeRTCDataChannelState :: Decode RTCDataChannelState where
     "closing"    -> pure RTCDataChannelStateClosing
     "closed"     -> pure RTCDataChannelStateClosed
     s            -> fail $ ForeignError $ "Unknown rtc data channel state: " <> show s
-
-data RTCIceCandidateType
-  = RTCIceCandidateTypeHost
-  | RTCIceCandidateTypeSrflx
-  | RTCIceCandidateTypePrflx
-  | RTCIceCandidateTypeRelay
-
-instance encodeRTCIceCandidateType :: Encode RTCIceCandidateType where
-  encode RTCIceCandidateTypeHost  = encode "host"
-  encode RTCIceCandidateTypeSrflx = encode "srflx"
-  encode RTCIceCandidateTypePrflx = encode "prflx"
-  encode RTCIceCandidateTypeRelay = encode "relay"
-
-instance decodeRTCIceCandidateType :: Decode RTCIceCandidateType where
-  decode f = readString f >>= case _ of
-    "host"  -> pure RTCIceCandidateTypeHost
-    "srflx" -> pure RTCIceCandidateTypeSrflx
-    "prflx" -> pure RTCIceCandidateTypePrflx
-    "relay" -> pure RTCIceCandidateTypeRelay
-    s       -> fail $ ForeignError $ "Unknown ice candidate type: " <> show s
 
 data RTCStatsIceCandidatePairState
   = RTCStatsIceCandidatePairStateFrozen

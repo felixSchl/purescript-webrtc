@@ -2,7 +2,7 @@ module WebRTC.RTC (
   RTCPeerConnection(..)
 , RTCSessionDescription(..)
 , RTCSdpType(..)
-, Ice(..)
+, IceConfig(..)
 , IceEvent(..)
 , MediaStreamEvent(..)
 , RTCIceCandidate(..)
@@ -31,14 +31,12 @@ module WebRTC.RTC (
 , rtcSessionDescription
 , getStats
 , close
+, isRelayCandidate
 ) where
 
-import Control.Monad.Aff (Aff, makeAff)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
-import Control.Monad.Except (runExcept, throwError)
-import Control.Alt ((<|>))
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
+import Data.List ((:), List(Nil))
+import Data.List as L
 import Data.Traversable (traverse)
 import Data.Generic (class Generic, gShow)
 import Data.Newtype (unwrap, wrap, class Newtype)
@@ -50,12 +48,18 @@ import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
 import Data.Foreign.NullOrUndefined (undefined)
 import Data.Foreign.Keys (keys)
+import Data.String as Str
+import Control.Monad.Aff (Aff, makeAff)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
+import Control.Monad.Except (runExcept, throwError)
+import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
-import Debug.Trace
 import Prelude
 
 import WebRTC.MediaStream
 import WebRTC.Stats
+import WebRTC.Candidate
 
 foreign import data IceEvent :: Type
 
@@ -63,7 +67,11 @@ newtype RTCIceCandidate = RTCIceCandidate
   { sdpMLineIndex :: Maybe Int
   , sdpMid :: Maybe String
   , candidate :: String
+  , type :: RTCIceCandidateType
   }
+
+isRelayCandidate :: RTCIceCandidate -> Boolean
+isRelayCandidate (RTCIceCandidate x) = x.type == RTCIceCandidateTypeRelay
 
 derive instance genericRTCIceCandidate :: Generic RTCIceCandidate
 derive instance eqRTCIceCandidate :: Eq RTCIceCandidate
@@ -77,14 +85,28 @@ instance encodeRTCIceCandidate :: Encode RTCIceCandidate where
     { sdpMLineIndex: maybe undefined toForeign cand.sdpMLineIndex
     , sdpMid: maybe undefined toForeign cand.sdpMid
     , candidate: encode cand.candidate
+    , type: encode cand.type
     }
 
 instance decodeRTCIceCandidate :: Decode RTCIceCandidate where
-  decode f = RTCIceCandidate <$> do
-    { candidate: _, sdpMid: _, sdpMLineIndex: _ }
-      <$> (readString =<< readProp "candidate" f)
-      <*> (readPropMaybe "sdpMid" f)
-      <*> (readPropMaybe "sdpMLineIndex" f)
+  decode o = do
+    candidate <- readString =<< readProp "candidate" o
+    let mType = case L.fromFoldable $ Str.split (wrap " ") candidate of
+                  x:_:_:_:_:_:_:typ:_ -> do
+                    _ <- case L.fromFoldable $ Str.split (wrap ":") x of
+                      "candidate":_:Nil -> Just unit
+                      _ -> Nothing
+                    case runExcept $ decode $ toForeign typ of
+                         Left _ -> Nothing
+                         Right v -> Just v
+                  _ -> Nothing
+    _type <- maybe  (fail $ ForeignError $ "Invalid candidate string: " <> show candidate)
+                    pure
+                    mType
+    RTCIceCandidate <$> do
+      { candidate, type: _type, sdpMid: _, sdpMLineIndex: _ }
+        <$> (readPropMaybe "sdpMid" o)
+        <*> (readPropMaybe "sdpMLineIndex" o)
 
 readPropMaybe :: ∀ a. Decode a => String -> Foreign -> F (Maybe a)
 readPropMaybe k v = do
@@ -212,16 +234,17 @@ instance decodeRTCSessionDescription :: Decode RTCSessionDescription where
 
 foreign import data RTCPeerConnection :: Type
 
-type Ice = {
-    iceServers :: Array {
+type IceConfig r = Record (
+  iceServers :: Array {
       url :: String
     , credential :: Nullable String
     , username :: Nullable String
-    }
   }
+  | r
+  )
 
 foreign import newRTCPeerConnection
-  :: forall e. Ice -> Eff e RTCPeerConnection
+  :: forall e r. IceConfig r -> Eff e RTCPeerConnection
 
 foreign import addStream
   :: forall e. MediaStream -> RTCPeerConnection -> Eff e Unit
