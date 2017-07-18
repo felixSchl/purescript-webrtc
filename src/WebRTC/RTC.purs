@@ -5,7 +5,6 @@ module WebRTC.RTC (
 , IceConfig(..)
 , IceEvent(..)
 , MediaStreamEvent(..)
-, RTCIceCandidate(..)
 , RTCSignalingState(..)
 , RTCDataChannel(..)
 , RTCIceConnectionState(..)
@@ -31,7 +30,6 @@ module WebRTC.RTC (
 , rtcSessionDescription
 , getStats
 , close
-, isRelayCandidate
 ) where
 
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
@@ -62,51 +60,6 @@ import WebRTC.Stats
 import WebRTC.Candidate
 
 foreign import data IceEvent :: Type
-
-newtype RTCIceCandidate = RTCIceCandidate
-  { sdpMLineIndex :: Maybe Int
-  , sdpMid :: Maybe String
-  , candidate :: String
-  , type :: RTCIceCandidateType
-  }
-
-isRelayCandidate :: RTCIceCandidate -> Boolean
-isRelayCandidate (RTCIceCandidate x) = x.type == RTCIceCandidateTypeRelay
-
-derive instance genericRTCIceCandidate :: Generic RTCIceCandidate
-derive instance eqRTCIceCandidate :: Eq RTCIceCandidate
-derive instance ordRTCIceCandidate :: Ord RTCIceCandidate
-
-instance showRTCIceCandidate :: Show RTCIceCandidate where
-  show = gShow
-
-instance encodeRTCIceCandidate :: Encode RTCIceCandidate where
-  encode (RTCIceCandidate cand) = toForeign
-    { sdpMLineIndex: maybe undefined toForeign cand.sdpMLineIndex
-    , sdpMid: maybe undefined toForeign cand.sdpMid
-    , candidate: encode cand.candidate
-    , type: encode cand.type
-    }
-
-instance decodeRTCIceCandidate :: Decode RTCIceCandidate where
-  decode o = do
-    candidate <- readString =<< readProp "candidate" o
-    let mType = case L.fromFoldable $ Str.split (wrap " ") candidate of
-                  x:_:_:_:_:_:_:typ:_ -> do
-                    _ <- case L.fromFoldable $ Str.split (wrap ":") x of
-                      "candidate":_:Nil -> Just unit
-                      _ -> Nothing
-                    case runExcept $ decode $ toForeign typ of
-                         Left _ -> Nothing
-                         Right v -> Just v
-                  _ -> Nothing
-    _type <- maybe  (fail $ ForeignError $ "Invalid candidate string: " <> show candidate)
-                    pure
-                    mType
-    RTCIceCandidate <$> do
-      { candidate, type: _type, sdpMid: _, sdpMLineIndex: _ }
-        <$> (readPropMaybe "sdpMid" o)
-        <*> (readPropMaybe "sdpMLineIndex" o)
 
 readPropMaybe :: ∀ a. Decode a => String -> Foreign -> F (Maybe a)
 readPropMaybe k v = do
