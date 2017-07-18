@@ -52,9 +52,6 @@ newtype RTCIceCandidate = RTCIceCandidate
   , type :: RTCIceCandidateType
   }
 
-isRelayCandidate :: RTCIceCandidate -> Boolean
-isRelayCandidate (RTCIceCandidate x) = x.type == RTCIceCandidateTypeRelay
-
 derive instance genericRTCIceCandidate :: Generic RTCIceCandidate
 derive instance eqRTCIceCandidate :: Eq RTCIceCandidate
 derive instance ordRTCIceCandidate :: Ord RTCIceCandidate
