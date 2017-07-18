@@ -23,10 +23,13 @@ derive instance eqRTCIceCandidateType :: Eq RTCIceCandidateType
 derive instance genericRTCIceCandidateType :: Generic RTCIceCandidateType
 
 instance encodeRTCIceCandidateType :: Encode RTCIceCandidateType where
-  encode RTCIceCandidateTypeHost  = encode "host"
-  encode RTCIceCandidateTypeSrflx = encode "srflx"
-  encode RTCIceCandidateTypePrflx = encode "prflx"
-  encode RTCIceCandidateTypeRelay = encode "relay"
+  encode = encode <<< rtcIceCandidateTypeToString
+
+rtcIceCandidateTypeToString :: RTCIceCandidateType -> String
+rtcIceCandidateTypeToString RTCIceCandidateTypeHost  = "host"
+rtcIceCandidateTypeToString RTCIceCandidateTypeSrflx = "srflx"
+rtcIceCandidateTypeToString RTCIceCandidateTypePrflx = "prflx"
+rtcIceCandidateTypeToString RTCIceCandidateTypeRelay = "relay"
 
 instance decodeRTCIceCandidateType :: Decode RTCIceCandidateType where
   decode o = readString o >>= case _ of
