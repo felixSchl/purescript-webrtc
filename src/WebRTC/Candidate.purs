@@ -12,7 +12,7 @@ import Data.Generic (class Generic)
 import Data.Foreign.Index (readProp, class Index, errorAt)
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
-                      readNullOrUndefined, readInt)
+                      readNullOrUndefined, readInt, isNull, isUndefined)
 import Data.Foreign.NullOrUndefined (undefined)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
 import Control.Alt ((<|>))
@@ -87,7 +87,10 @@ instance decodeRTCIceCandidate :: Decode RTCIceCandidate where
         <$> (readPropMaybe "sdpMid" o)
         <*> (readPropMaybe "sdpMLineIndex" o)
 
+readPropMaybe :: ∀ a. Decode a => String -> Foreign -> F (Maybe a)
 readPropMaybe k v = do
   p <- readProp k v
-  (Nothing <$ readNullOrUndefined p) <|> (Just <$> decode p)
+  if isNull p || isUndefined p
+    then pure Nothing
+    else Just <$> decode p
 

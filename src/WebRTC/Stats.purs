@@ -6,7 +6,7 @@ import Data.Bifunctor (lmap)
 import Data.Foreign.Index (readProp, class Index, errorAt)
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
-                      readNullOrUndefined, readInt)
+                      readNullOrUndefined, readInt, isNull, isUndefined)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
 import Control.Alt ((<|>))
 import Control.Monad.Except (mapExcept)
@@ -15,7 +15,10 @@ import WebRTC.Candidate
 readPropMaybe :: ∀ a. Decode a => String -> Foreign -> F (Maybe a)
 readPropMaybe k v = do
   p <- readProp k v
-  (Nothing <$ readNullOrUndefined p) <|> (Just <$> decode p)
+  if isNull p || isUndefined p
+    then pure Nothing
+    else Just <$> decode p
+
 
 data RTCStats
   = RTCStatsCodec
@@ -518,7 +521,7 @@ type BaseRTCStats r = Record
   )
 
 type BaseRTCRTPStreamStats r = BaseRTCStats
-  ( ssrc :: Maybe String
+  ( ssrc :: Maybe Number
   , associateStatsId :: Maybe String
   , isRemote :: Boolean -- (default: false)
   , mediaType :: String

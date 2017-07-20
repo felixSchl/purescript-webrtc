@@ -42,7 +42,7 @@ import Data.Nullable (Nullable)
 import Data.Either (Either(..), fromRight)
 import Data.Foreign.Index (readProp, class Index)
 import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
-                      readNullOrUndefined, readInt, readArray)
+                      readNullOrUndefined, readInt, readArray, isNull, isUndefined)
 import Data.Foreign.Class (class Decode, class Encode, encode, decode)
 import Data.Foreign.NullOrUndefined (undefined)
 import Data.Foreign.Keys (keys)
@@ -64,7 +64,10 @@ foreign import data IceEvent :: Type
 readPropMaybe :: ∀ a. Decode a => String -> Foreign -> F (Maybe a)
 readPropMaybe k v = do
   p <- readProp k v
-  (Nothing <$ readNullOrUndefined p) <|> (Just <$> decode p)
+  if isNull p || isUndefined p
+    then pure Nothing
+    else Just <$> decode p
+
 
 data RTCSignalingState
   = RTCSignalingStateStable
