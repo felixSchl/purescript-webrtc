@@ -30,6 +30,7 @@ module WebRTC.RTC (
 , rtcSessionDescription
 , getStats
 , close
+, module Reexports
 ) where
 
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
@@ -58,6 +59,7 @@ import Prelude
 import WebRTC.MediaStream
 import WebRTC.Stats
 import WebRTC.Candidate
+import WebRTC.Candidate as Reexports
 
 foreign import data IceEvent :: Type
 
