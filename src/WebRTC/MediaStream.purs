@@ -13,11 +13,13 @@ module WebRTC.MediaStream (
 ) where
 
 import Prelude
-import Unsafe.Coerce (unsafeCoerce)
-import Control.Monad.Aff (Aff(), makeAff)
-import Control.Monad.Eff (Eff(), kind Effect)
-import Control.Monad.Eff.Exception (Error())
+
+import Control.Monad.Aff (Aff, makeAff, nonCanceler)
+import Control.Monad.Eff (Eff, kind Effect)
+import Control.Monad.Eff.Exception (Error)
+import Data.Either (Either(..))
 import Partial.Unsafe (unsafePartial)
+import Unsafe.Coerce (unsafeCoerce)
 
 foreign import refEq :: ∀ a. a -> a -> Boolean
 
@@ -35,7 +37,10 @@ foreign import _getUserMedia
 foreign import data USER_MEDIA :: Effect
 
 getUserMedia :: forall e. MediaStreamConstraints -> Aff (userMedia :: USER_MEDIA | e) MediaStream
-getUserMedia c = makeAff (\e s -> _getUserMedia s e c)
+getUserMedia constraints =
+  makeAff \cb ->
+    nonCanceler <$ do
+      _getUserMedia (cb <<< Right) (cb <<< Left) constraints
 
 newtype MediaStreamConstraints =
   MediaStreamConstraints { video :: Boolean

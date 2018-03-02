@@ -37,13 +37,19 @@ rtcIceCandidateTypeToString RTCIceCandidateTypeSrflx = "srflx"
 rtcIceCandidateTypeToString RTCIceCandidateTypePrflx = "prflx"
 rtcIceCandidateTypeToString RTCIceCandidateTypeRelay = "relay"
 
+rtcIceCandidateTypeFromString :: String -> Either String RTCIceCandidateType
+rtcIceCandidateTypeFromString = case _ of
+  "host"  -> pure RTCIceCandidateTypeHost
+  "srflx" -> pure RTCIceCandidateTypeSrflx
+  "prflx" -> pure RTCIceCandidateTypePrflx
+  "relay" -> pure RTCIceCandidateTypeRelay
+  s       -> Left $ "Unknown ice candidate type: " <> show s
+
 instance decodeRTCIceCandidateType :: Decode RTCIceCandidateType where
-  decode o = readString o >>= case _ of
-    "host"  -> pure RTCIceCandidateTypeHost
-    "srflx" -> pure RTCIceCandidateTypeSrflx
-    "prflx" -> pure RTCIceCandidateTypePrflx
-    "relay" -> pure RTCIceCandidateTypeRelay
-    s       -> fail $ ForeignError $ "Unknown ice candidate type: " <> show s
+  decode o = readString o >>= \s ->
+    case rtcIceCandidateTypeFromString s of
+      Right v -> pure v
+      Left  s -> fail $ ForeignError s
 
 newtype RTCIceCandidate = RTCIceCandidate
   { sdpMLineIndex :: Maybe Int

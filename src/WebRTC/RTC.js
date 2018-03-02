@@ -48,19 +48,22 @@ exports.onremovestream = function(f) {
 
 exports._createOffer = function(success) {
     return function(error) {
-        return function(pc) {
-            return function() {
-                pc.createOffer(
-                    { offerToReceiveAudio: 1,
-                      offerToReceiveVideo: 1 }
-                ).then(
-                    function(desc) {
-                        success(desc)();
-                    },
-                    function(e) {
-                        error(e)();
-                    }
-                );
+        return function (options) {
+            return function(pc) {
+                return function() {
+                    pc.createOffer(
+                        { iceRestart: options.iceRestart,
+                          offerToReceiveAudio: 1,
+                          offerToReceiveVideo: 1 }
+                    ).then(
+                        function(desc) {
+                            success(desc)();
+                        },
+                        function(e) {
+                            error(e)();
+                        }
+                    );
+                };
             };
         };
     };
@@ -250,4 +253,14 @@ exports._getIceConnectionState = function(pc) {
   return pc.iceConnectionState;
 };
 
+exports.getLocalStreams = function(pc) {
+  return function() {
+    return pc.getLocalStreams();
+  }
+};
 
+exports.getRemoteStreams = function(pc) {
+  return function() {
+    return pc.getRemoteStreams();
+  }
+};
