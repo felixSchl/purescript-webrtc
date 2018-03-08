@@ -16,7 +16,9 @@ module WebRTC.RTC (
 , setLocalDescription
 , setRemoteDescription
 , addIceCandidate
+, candidateGatheringDone
 , createDataChannel
+, canTrickleIceCandidates
 , send
 , onmessageChannel
 , oniceconnectionstatechange
@@ -213,6 +215,11 @@ addIceCandidate
   -> RTCPeerConnection
   -> Eff e Unit
 addIceCandidate = _addIceCandidate <<< encode
+
+foreign import candidateGatheringDone
+  :: ∀ e
+   . RTCPeerConnection
+  -> Eff e Unit
 
 type MediaStreamEvent = { stream :: MediaStream }
 
@@ -417,3 +424,17 @@ getStats mTrack pc = do
 
 foreign import getRemoteStreams :: ∀ eff. RTCPeerConnection -> Eff eff (Array MediaStream)
 foreign import getLocalStreams :: ∀ eff. RTCPeerConnection -> Eff eff (Array MediaStream)
+
+canTrickleIceCandidates
+  :: ∀ eff
+   . RTCPeerConnection
+  -> Eff eff Boolean
+canTrickleIceCandidates =
+  _canTrickleIceCandidates Just Nothing
+
+foreign import _canTrickleIceCandidates
+  :: ∀ eff
+   . (Boolean -> Maybe Boolean)
+  -> Maybe Boolean
+  -> RTCPeerConnection
+  -> Eff eff Boolean

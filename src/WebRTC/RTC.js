@@ -264,3 +264,24 @@ exports.getRemoteStreams = function(pc) {
     return pc.getRemoteStreams();
   }
 };
+
+exports.candidateGatheringDone = function(pc) {
+  return function() {
+    pc.addIceCandidate(null);
+    return {}
+  }
+}
+
+exports._canTrickleIceCandidates = function(just) {
+  return function(nothing) {
+    return function(pc) {
+      return function() {
+        if (pc.canTrickleIceCandidates != null) {
+          return just(!!pc.canTrickleIceCandidates)
+        } else {
+          return nothing
+        }
+      }
+    }
+  }
+}
