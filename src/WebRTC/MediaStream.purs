@@ -4,7 +4,6 @@ module WebRTC.MediaStream (
 , MediaStreamTrackKind(..)
 , MediaStreamConstraints(..)
 , Blob(..)
-, USER_MEDIA()
 , getUserMedia
 , mediaStreamToBlob
 , createObjectURL
@@ -14,9 +13,9 @@ module WebRTC.MediaStream (
 
 import Prelude
 
-import Control.Monad.Aff (Aff, makeAff, nonCanceler)
-import Control.Monad.Eff (Eff, kind Effect)
-import Control.Monad.Eff.Exception (Error)
+import Effect.Aff (Aff, makeAff, nonCanceler)
+import Effect (Effect)
+import Effect.Exception (Error)
 import Data.Either (Either(..))
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
@@ -29,14 +28,12 @@ instance eqMediaStream :: Eq MediaStream where
   eq = refEq
 
 foreign import _getUserMedia
-  :: forall e. (MediaStream -> Eff e Unit) ->
-               (Error -> Eff e Unit) ->
-               MediaStreamConstraints ->
-               Eff e Unit
+  :: (MediaStream -> Effect Unit) ->
+      (Error -> Effect Unit) ->
+      MediaStreamConstraints ->
+      Effect Unit
 
-foreign import data USER_MEDIA :: Effect
-
-getUserMedia :: forall e. MediaStreamConstraints -> Aff (userMedia :: USER_MEDIA | e) MediaStream
+getUserMedia :: MediaStreamConstraints -> Aff MediaStream
 getUserMedia constraints =
   makeAff \cb ->
     nonCanceler <$ do
@@ -53,7 +50,7 @@ mediaStreamToBlob :: MediaStream -> Blob
 mediaStreamToBlob = unsafeCoerce
 
 foreign import createObjectURL
-  :: forall e. Blob -> Eff e String
+  :: Blob -> Effect String
 
 foreign import data MediaStreamTrack :: Type
 

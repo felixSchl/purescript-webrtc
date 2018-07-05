@@ -5,18 +5,15 @@ import Data.Either (Either(..))
 import Data.List ((:), List(Nil))
 import Data.List as L
 import Data.String as Str
-import Data.Generic (class Generic, gShow)
-import Data.Newtype (unwrap, wrap, class Newtype)
-import Data.Bifunctor (lmap)
-import Data.Generic (class Generic)
-import Data.Foreign.Index (readProp, class Index, errorAt)
-import Data.Maybe (Maybe(..), maybe, fromMaybe)
-import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
-                      readNullOrUndefined, readInt, isNull, isUndefined)
-import Data.Foreign.NullOrUndefined (undefined)
-import Data.Foreign.Class (class Decode, class Encode, encode, decode)
-import Control.Alt ((<|>))
-import Control.Monad.Except (mapExcept, runExcept, throwError)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Newtype (wrap)
+import Foreign.Index (readProp)
+import Data.Maybe (Maybe(..), maybe)
+import Foreign (F, Foreign, ForeignError(..), fail, isNull, isUndefined, readString, unsafeToForeign)
+import Foreign.NullOrUndefined (undefined)
+import Foreign.Class (class Decode, class Encode, encode, decode)
+import Control.Monad.Except (runExcept)
 
 data RTCIceCandidateType
   = RTCIceCandidateTypeHost
@@ -26,7 +23,10 @@ data RTCIceCandidateType
 
 derive instance ordRTCIceCandidateType :: Ord RTCIceCandidateType
 derive instance eqRTCIceCandidateType :: Eq RTCIceCandidateType
-derive instance genericRTCIceCandidateType :: Generic RTCIceCandidateType
+derive instance genericRTCIceCandidateType :: Generic RTCIceCandidateType _
+
+instance showRTCIceCandidateType :: Show RTCIceCandidateType where
+  show = genericShow
 
 instance encodeRTCIceCandidateType :: Encode RTCIceCandidateType where
   encode = encode <<< rtcIceCandidateTypeToString
@@ -49,7 +49,7 @@ instance decodeRTCIceCandidateType :: Decode RTCIceCandidateType where
   decode o = readString o >>= \s ->
     case rtcIceCandidateTypeFromString s of
       Right v -> pure v
-      Left  s -> fail $ ForeignError s
+      Left  e -> fail $ ForeignError e
 
 newtype RTCIceCandidate = RTCIceCandidate
   { sdpMLineIndex :: Maybe Int
@@ -58,17 +58,17 @@ newtype RTCIceCandidate = RTCIceCandidate
   , type :: RTCIceCandidateType
   }
 
-derive instance genericRTCIceCandidate :: Generic RTCIceCandidate
+derive instance genericRTCIceCandidate :: Generic RTCIceCandidate _
 derive instance eqRTCIceCandidate :: Eq RTCIceCandidate
 derive instance ordRTCIceCandidate :: Ord RTCIceCandidate
 
 instance showRTCIceCandidate :: Show RTCIceCandidate where
-  show = gShow
+  show = genericShow
 
 instance encodeRTCIceCandidate :: Encode RTCIceCandidate where
-  encode (RTCIceCandidate cand) = toForeign
-    { sdpMLineIndex: maybe undefined toForeign cand.sdpMLineIndex
-    , sdpMid: maybe undefined toForeign cand.sdpMid
+  encode (RTCIceCandidate cand) = unsafeToForeign
+    { sdpMLineIndex: maybe undefined unsafeToForeign cand.sdpMLineIndex
+    , sdpMid: maybe undefined unsafeToForeign cand.sdpMid
     , candidate: encode cand.candidate
     , type: encode cand.type
     }
@@ -81,7 +81,7 @@ instance decodeRTCIceCandidate :: Decode RTCIceCandidate where
                     _ <- case L.fromFoldable $ Str.split (wrap ":") x of
                       "candidate":_:Nil -> Just unit
                       _ -> Nothing
-                    case runExcept $ decode $ toForeign typ of
+                    case runExcept $ decode $ unsafeToForeign typ of
                          Left _ -> Nothing
                          Right v -> Just v
                   _ -> Nothing

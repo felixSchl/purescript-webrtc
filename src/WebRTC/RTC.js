@@ -156,9 +156,9 @@ exports._addIceCandidate = function(c) {
     };
 };
 
-exports.newRTCSessionDescription = function(s) {
-    return new RTCSessionDescription(s);
-};
+// exports.newRTCSessionDescription = function(s) {
+//     return new RTCSessionDescription(s);
+// };
 
 exports.createDataChannel = function(s) {
     return function(pc) {

@@ -3,11 +3,11 @@ module WebRTC.Stats where
 import Prelude
 import Data.Either (Either(..))
 import Data.Bifunctor (lmap)
-import Data.Foreign.Index (readProp, class Index, errorAt)
+import Foreign.Index (readProp, class Index, errorAt)
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
-import Data.Foreign (Foreign, readString, ForeignError(..), F, fail, toForeign,
+import Foreign (Foreign, readString, ForeignError(..), F, fail, unsafeToForeign,
                       readNullOrUndefined, readInt, isNull, isUndefined)
-import Data.Foreign.Class (class Decode, class Encode, encode, decode)
+import Foreign.Class (class Decode, class Encode, encode, decode)
 import Control.Alt ((<|>))
 import Control.Monad.Except (mapExcept)
 import WebRTC.Candidate
