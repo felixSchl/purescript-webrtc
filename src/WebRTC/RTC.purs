@@ -39,21 +39,22 @@ module WebRTC.RTC (
 
 import Prelude
 
-import Control.Monad.Aff (Aff, makeAff, nonCanceler)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Exception (Error, error, throwException, EXCEPTION)
+import Effect.Aff (Aff, makeAff, nonCanceler)
+import Effect (Effect)
+import Effect.Exception (Error, error, throwException)
 import Control.Monad.Except (runExcept, throwError)
 import Data.Either (Either(Right, Left))
-import Data.Foreign (F, Foreign, ForeignError(ForeignError), fail, isNull, isUndefined, readArray, readString, toForeign)
-import Data.Foreign.Class (class Decode, class Encode, encode, decode)
-import Data.Foreign.Index (readProp)
-import Data.Generic (class Generic, gShow)
+import Foreign (F, Foreign, ForeignError(ForeignError), fail, isNull, isUndefined, readArray, readString, unsafeToForeign)
+import Foreign.Class (class Decode, class Encode, encode, decode)
+import Foreign.Index (readProp)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Newtype (class Newtype)
 import Data.Nullable (Nullable)
 import Data.Traversable (traverse)
 import WebRTC.Candidate (RTCIceCandidate)
-import WebRTC.Candidate as Reexports
+import WebRTC.Candidate (RTCIceCandidate(..), RTCIceCandidateType(..), readPropMaybe, rtcIceCandidateTypeFromString, rtcIceCandidateTypeToString) as Reexports
 import WebRTC.MediaStream (MediaStream, MediaStreamTrack)
 import WebRTC.Stats (RTCStats)
 
@@ -76,12 +77,12 @@ data RTCSignalingState
   | RTCSignalingStateClosed
   | RTCSignalingStateUnknown String
 
-derive instance genericRTCSignalingState :: Generic RTCSignalingState
+derive instance genericRTCSignalingState :: Generic RTCSignalingState _
 derive instance eqRTCSignalingState :: Eq RTCSignalingState
 derive instance ordRTCSignalingState :: Ord RTCSignalingState
 
 instance showRTCSignalingState :: Show RTCSignalingState where
-  show = gShow
+  show = genericShow
 
 instance encodeRTCSignalingState :: Encode RTCSignalingState where
   encode RTCSignalingStateStable             = encode "stable"
@@ -111,12 +112,12 @@ data RTCIceConnectionState
   | RTCIceConnectionStateDisconnected
   | RTCIceConnectionStateClosed
 
-derive instance genericRTCIceConnectionState :: Generic RTCIceConnectionState
+derive instance genericRTCIceConnectionState :: Generic RTCIceConnectionState _
 derive instance eqRTCIceConnectionState :: Eq RTCIceConnectionState
 derive instance ordRTCIceConnectionState :: Ord RTCIceConnectionState
 
 instance showRTCIceConnectionState :: Show RTCIceConnectionState where
-  show = gShow
+  show = genericShow
 
 instance encodeRTCIceConnectionState :: Encode RTCIceConnectionState where
   encode RTCIceConnectionStateNew          = encode "new"
@@ -144,12 +145,12 @@ data RTCSdpType
   | RTCSdpTypePranswer
   | RTCSdpTypeRollback
 
-derive instance genericRTCSdpType :: Generic RTCSdpType
+derive instance genericRTCSdpType :: Generic RTCSdpType _
 derive instance eqRTCSdpType :: Eq RTCSdpType
 derive instance ordRTCSdpType :: Ord RTCSdpType
 
 instance showRTCSdpType :: Show RTCSdpType where
-  show = gShow
+  show = genericShow
 
 instance encodeRTCSdpType :: Encode RTCSdpType where
   encode RTCSdpTypeAnswer   = encode "answer"
@@ -176,7 +177,7 @@ rtcSessionDescription type_ sdp = RTCSessionDescription { type: type_, sdp }
 derive instance rtcSessionDescriptionNewtype :: Newtype RTCSessionDescription _
 
 instance encodeRTCSessionDescription :: Encode RTCSessionDescription where
-  encode (RTCSessionDescription desc) = toForeign { type: encode desc.type
+  encode (RTCSessionDescription desc) = unsafeToForeign { type: encode desc.type
                                                   , sdp: desc.sdp
                                                   }
 
@@ -198,70 +199,67 @@ type IceConfig r = Record (
   )
 
 foreign import newRTCPeerConnection
-  :: forall e r. IceConfig r -> Eff e RTCPeerConnection
+  :: forall r. IceConfig r -> Effect RTCPeerConnection
 
 foreign import addStream
-  :: forall e. MediaStream -> RTCPeerConnection -> Eff e Unit
+  :: MediaStream -> RTCPeerConnection -> Effect Unit
 
 foreign import removeStream
-  :: forall e. MediaStream -> RTCPeerConnection -> Eff e Unit
+  :: MediaStream -> RTCPeerConnection -> Effect Unit
 
 foreign import _addIceCandidate
-  :: forall e. Foreign -> RTCPeerConnection -> Eff e Unit
+  :: Foreign -> RTCPeerConnection -> Effect Unit
 
 addIceCandidate
-  :: ∀ e
-   . RTCIceCandidate
+  :: RTCIceCandidate
   -> RTCPeerConnection
-  -> Eff e Unit
+  -> Effect Unit
 addIceCandidate = _addIceCandidate <<< encode
 
 foreign import candidateGatheringDone
-  :: ∀ e
-   . RTCPeerConnection
-  -> Eff e Unit
+  :: RTCPeerConnection
+  -> Effect Unit
 
 type MediaStreamEvent = { stream :: MediaStream }
 
 foreign import onaddstream
-  :: forall e. (MediaStreamEvent -> Eff e Unit) ->
-               RTCPeerConnection ->
-               Eff e Unit
+  :: (MediaStreamEvent -> Effect Unit) ->
+      RTCPeerConnection ->
+      Effect Unit
 
 foreign import onremovestream
-  :: forall e. (MediaStreamEvent -> Eff e Unit) ->
-               RTCPeerConnection ->
-               Eff e Unit
+  :: (MediaStreamEvent -> Effect Unit) ->
+      RTCPeerConnection ->
+      Effect Unit
 
 foreign import _createOffer
-  :: forall e. (Foreign -> Eff e Unit) ->
-               (Error -> Eff e Unit) ->
-               Foreign ->
-               RTCPeerConnection ->
-               Eff e Unit
+  :: (Foreign -> Effect Unit) ->
+      (Error -> Effect Unit) ->
+      Foreign ->
+      RTCPeerConnection ->
+      Effect Unit
 
 type CreateOfferOptions =
   { iceRestart :: Boolean
   }
 
-createOffer :: forall e. CreateOfferOptions -> RTCPeerConnection -> Aff e RTCSessionDescription
+createOffer :: CreateOfferOptions -> RTCPeerConnection -> Aff RTCSessionDescription
 createOffer opts pc = do
   f <-
     makeAff \cb ->
       nonCanceler <$ do
-        _createOffer (cb <<< Right) (cb <<< Left) (toForeign opts) pc
+        _createOffer (cb <<< Right) (cb <<< Left) (unsafeToForeign opts) pc
   case runExcept $ decode f of
        Left err -> throwError (error $ show err)
        Right v  -> pure v
 
 foreign import _createAnswer
-  :: ∀ e
-   . (Foreign -> Eff e Unit)
-  -> (Error -> Eff e Unit)
+  :: (Foreign -> Effect Unit)
+  -> (Error -> Effect Unit)
   -> RTCPeerConnection
-  -> Eff e Unit
+  -> Effect Unit
 
-createAnswer :: forall e. RTCPeerConnection -> Aff e RTCSessionDescription
+createAnswer :: RTCPeerConnection -> Aff RTCSessionDescription
 createAnswer pc = do
   f <-
     makeAff \cb ->
@@ -272,28 +270,26 @@ createAnswer pc = do
        Right v  -> pure v
 
 foreign import _setLocalDescription
-  :: ∀ e
-   . Eff e Unit
-  -> (Error -> Eff e Unit)
+  :: Effect Unit
+  -> (Error -> Effect Unit)
   -> Foreign
   -> RTCPeerConnection
-  -> Eff e Unit
+  -> Effect Unit
 
-setLocalDescription :: forall e. RTCSessionDescription -> RTCPeerConnection -> Aff e Unit
+setLocalDescription :: RTCSessionDescription -> RTCPeerConnection -> Aff Unit
 setLocalDescription desc pc =
   makeAff \cb ->
     nonCanceler <$ do
       _setLocalDescription (cb (Right unit)) (cb <<< Left) (encode desc) pc
 
 foreign import _setRemoteDescription
-  :: ∀ e
-   . Eff e Unit
-  -> (Error -> Eff e Unit)
+  :: Effect Unit
+  -> (Error -> Effect Unit)
   -> Foreign
   -> RTCPeerConnection
-  -> Eff e Unit
+  -> Effect Unit
 
-setRemoteDescription :: ∀ e. RTCSessionDescription -> RTCPeerConnection -> Aff e Unit
+setRemoteDescription :: RTCSessionDescription -> RTCPeerConnection -> Aff Unit
 setRemoteDescription desc pc =
   makeAff \cb ->
     nonCanceler <$ do
@@ -302,76 +298,74 @@ setRemoteDescription desc pc =
 foreign import data RTCDataChannel :: Type
 
 foreign import createDataChannel
-  :: forall e. String ->
-               RTCPeerConnection ->
-               Eff e RTCDataChannel
+  :: String ->
+     RTCPeerConnection ->
+     Effect RTCDataChannel
 
 foreign import send
-  :: forall e. String ->
-               RTCDataChannel ->
-               Eff e Unit
+  :: String ->
+     RTCDataChannel ->
+     Effect Unit
 
 foreign import close
-  :: forall e. RTCPeerConnection ->
-               Eff e Unit
+  :: RTCPeerConnection ->
+     Effect Unit
 
 foreign import onmessageChannel
-  :: forall e. (String -> Eff e Unit) ->
-               RTCDataChannel ->
-               Eff e Unit
+  :: (String -> Effect Unit) ->
+      RTCDataChannel ->
+      Effect Unit
 
 foreign import _oniceconnectionstatechange
-  :: forall e. (Foreign -> Eff e Unit) ->
-               RTCPeerConnection ->
-               Eff e Unit
+  :: (Foreign -> Effect Unit) ->
+      RTCPeerConnection ->
+      Effect Unit
 
 oniceconnectionstatechange
-  :: forall e. (RTCIceConnectionState -> Eff (exception :: EXCEPTION | e) Unit) ->
-               RTCPeerConnection ->
-               Eff (exception :: EXCEPTION | e) Unit
+  :: (RTCIceConnectionState -> Effect Unit) ->
+      RTCPeerConnection ->
+      Effect Unit
 oniceconnectionstatechange f = _oniceconnectionstatechange \state ->
   case runExcept $ decode state of
     Right s  -> f s
     Left err -> throwException $ error $ show err
 
 foreign import _onsignalingstatechange
-  :: forall e. (Foreign -> Eff e Unit) ->
-               RTCPeerConnection ->
-               Eff e Unit
+  :: (Foreign -> Effect Unit) ->
+      RTCPeerConnection ->
+      Effect Unit
 
 onsignalingstatechange
-  :: forall e. (RTCSignalingState -> Eff (exception :: EXCEPTION | e) Unit) ->
-               RTCPeerConnection ->
-               Eff (exception :: EXCEPTION | e) Unit
+  :: (RTCSignalingState -> Effect Unit) ->
+      RTCPeerConnection ->
+      Effect Unit
 onsignalingstatechange f = _onsignalingstatechange \state ->
   case runExcept $ decode state of
     Right s  -> f s
     Left err -> throwException $ error $ show err
 
 foreign import onnegotiationneeded
-  :: forall e a
-   . Eff e Unit
+  :: Effect Unit
   -> RTCPeerConnection
-  -> Eff e Unit
+  -> Effect Unit
 
 foreign import _onicecandidate
-  :: forall e a
+  :: forall a
    . (a -> Maybe a)
   -> (Maybe a)
-  -> (Maybe Foreign -> Eff e Unit)
+  -> (Maybe Foreign -> Effect Unit)
   -> RTCPeerConnection
-  -> Eff e Unit
+  -> Effect Unit
 
 onicecandidate
-  :: ∀ e
-   . (Maybe RTCIceCandidate -> Eff (exception :: EXCEPTION | e) Unit)
+  :: (Maybe RTCIceCandidate -> Effect Unit)
   -> RTCPeerConnection
-  -> Eff (exception :: EXCEPTION | e) Unit
+  -> Effect Unit
 onicecandidate f = _onicecandidate Just Nothing \mCand -> do
   cand <- case mCand of
     Just cand ->
       case runExcept $ decode cand of
-        Right cand -> pure $ Just cand
+        Right cand' -> pure $ Just cand'
         Left err   -> throwException $ error $ show err
     Nothing -> pure Nothing
   f cand
@@ -380,7 +374,7 @@ foreign import _getSignalingState
   :: RTCPeerConnection
   -> Foreign
 
-getSignalingState :: ∀ eff. RTCPeerConnection -> Eff (exception :: EXCEPTION | eff) RTCSignalingState
+getSignalingState :: RTCPeerConnection -> Effect RTCSignalingState
 getSignalingState pc =
   case runExcept $ decode $ _getSignalingState pc of
     Left err -> throwException (error $ show err)
@@ -390,51 +384,47 @@ foreign import _getIceConnectionState
   :: RTCPeerConnection
   -> Foreign
 
-getIceConnectionState :: ∀ eff. RTCPeerConnection -> Eff (exception :: EXCEPTION | eff) RTCIceConnectionState
+getIceConnectionState :: RTCPeerConnection -> Effect RTCIceConnectionState
 getIceConnectionState pc =
   case runExcept $ decode $ _getIceConnectionState pc of
     Left err -> throwException (error $ show err)
     Right v -> pure v
 
 foreign import _getStats
-  :: ∀ eff
-   . (Foreign -> Eff eff Unit)
-  -> (Error -> Eff eff Unit)
+  :: (Foreign -> Effect Unit)
+  -> (Error -> Effect Unit)
   -> Foreign
   -> RTCPeerConnection
-  -> Eff eff Unit
+  -> Effect Unit
 
 foreign import _null :: Foreign
 
 getStats
-  :: ∀ eff
-   . Maybe MediaStreamTrack
+  :: Maybe MediaStreamTrack
   -> RTCPeerConnection
-  -> Aff (exception :: EXCEPTION | eff) (Array RTCStats)
+  -> Aff (Array RTCStats)
 getStats mTrack pc = do
   o <-
     makeAff \cb ->
       nonCanceler <$ do
-        _getStats (cb <<< Right) (cb <<< Left) (maybe _null toForeign mTrack) pc
+        _getStats (cb <<< Right) (cb <<< Left) (maybe _null unsafeToForeign mTrack) pc
   case runExcept $ go o of
        Left err -> throwError (error $ show err)
        Right v  -> pure v
   where
   go o = readArray o >>= traverse decode
 
-foreign import getRemoteStreams :: ∀ eff. RTCPeerConnection -> Eff eff (Array MediaStream)
-foreign import getLocalStreams :: ∀ eff. RTCPeerConnection -> Eff eff (Array MediaStream)
+foreign import getRemoteStreams :: RTCPeerConnection -> Effect (Array MediaStream)
+foreign import getLocalStreams :: RTCPeerConnection -> Effect (Array MediaStream)
 
 canTrickleIceCandidates
-  :: ∀ eff
-   . RTCPeerConnection
-  -> Eff eff Boolean
+  :: RTCPeerConnection
+  -> Effect Boolean
 canTrickleIceCandidates =
   _canTrickleIceCandidates Just Nothing
 
 foreign import _canTrickleIceCandidates
-  :: ∀ eff
-   . (Boolean -> Maybe Boolean)
+  :: (Boolean -> Maybe Boolean)
   -> Maybe Boolean
   -> RTCPeerConnection
-  -> Eff eff Boolean
+  -> Effect Boolean
