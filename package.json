@@ -1,0 +1,25 @@
+{
+  "name": "purescript-webrtc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "pulp test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dn3010/purescript-webrtc.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dn3010/purescript-webrtc/issues"
+  },
+  "homepage": "https://github.com/dn3010/purescript-webrtc#readme",
+  "devDependencies": {
+    "bower": "^1.8.4",
+    "pulp": "^12.3.0",
+    "purescript": "^0.12.1"
+  }
+}
